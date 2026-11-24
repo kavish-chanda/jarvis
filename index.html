@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>J.A.R.V.I.S — Your voice assistant for Windows</title>
+  <link rel="icon" href="jarvis_logo.png">
+  <style>
+    :root {
+      --bg: #070b14;
+      --panel: #0d1424;
+      --panel2: #131d33;
+      --line: #1c2a48;
+      --acc: #00d4ff;
+      --mint: #5effd0;
+      --txt: #d6e4ff;
+      --dim: #7a8aa8
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0
+    }
+
+    html {
+      scroll-behavior: smooth
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--txt);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      line-height: 1.55;
+      overflow-x: hidden
+    }
+
+    a {
+      color: var(--acc)
+    }
+
+    .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 22px
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(7, 11, 20, .8);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--line)
+    }
+
+    nav .wrap {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      height: 58px
+    }
+
+    nav b {
+      color: var(--acc);
+      letter-spacing: 2px;
+      margin-right: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+
+    nav img {
+      width: 28px;
+      height: 28px
+    }
+
+    nav a {
+      color: var(--dim);
+      text-decoration: none;
+      font-size: 14px
+    }
+
+    nav a:hover {
+      color: var(--txt)
+    }
+
+    .btn {
+      display: inline-block;
+      border: 0;
+      border-radius: 10px;
+      padding: 13px 26px;
+      font: 700 15px inherit;
+      font-family: inherit;
+      cursor: pointer;
+      text-decoration: none;
+      transition: .2s
+    }
+
+    .btn.pri {
+      background: var(--acc);
+      color: #04101a;
+      box-shadow: 0 0 28px rgba(0, 212, 255, .35)
+    }
+
+    .btn.pri:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 44px rgba(0, 212, 255, .6)
+    }
+
+    .btn.sec {
+      background: transparent;
+      color: var(--txt);
+      border: 1px solid var(--line)
+    }
+
+    .btn.sec:hover {
+      border-color: var(--acc)
+    }
+
+    .hero {
+      text-align: center;
+      padding: 30px 0 10px;
+      position: relative
+    }
+
+    .hero canvas {
+      width: 100%;
+      height: 440px;
+      display: block;
+      cursor: pointer
+    }
+
+    .hero h1 {
+      font-size: clamp(40px, 8vw, 76px);
+      letter-spacing: 8px;
+      color: var(--acc);
+      text-shadow: 0 0 40px rgba(0, 212, 255, .45);
+      margin-top: -24px
+    }
+
+    .hero p {
+      color: var(--dim);
+      max-width: 560px;
+      margin: 10px auto 26px;
+      font-size: 18px
+    }
+
+    .hero .row {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap
+    }
+
+    .hint {
+      font-size: 12px;
+      color: var(--dim);
+      margin-top: 14px
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 12px;
+      border: 1px solid var(--line);
+      border-radius: 99px;
+      padding: 3px 12px;
+      color: var(--mint);
+      margin-bottom: 14px
+    }
+
+    section {
+      padding: 80px 0
+    }
+
+    h2 {
+      font-size: clamp(26px, 4vw, 38px);
+      margin-bottom: 8px
+    }
+
+    .sub {
+      color: var(--dim);
+      margin-bottom: 34px;
+      max-width: 620px
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(26px);
+      transition: .7s
+    }
+
+    .reveal.in {
+      opacity: 1;
+      transform: none
+    }
+
+    /* demo */
+    .demo {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr;
+      gap: 22px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 22px
+    }
+
+    .demo canvas {
+      width: 100%;
+      height: 300px;
+      display: block
+    }
+
+    .log {
+      background: var(--panel2);
+      border-radius: 12px;
+      padding: 14px;
+      height: 230px;
+      overflow: auto;
+      font-size: 14px
+    }
+
+    .log div {
+      margin-bottom: 9px
+    }
+
+    .you {
+      color: var(--acc)
+    }
+
+    .jv {
+      color: #fff
+    }
+
+    .sys {
+      color: var(--dim);
+      font-size: 12px
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0
+    }
+
+    .chip {
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      color: var(--txt);
+      border-radius: 99px;
+      padding: 7px 14px;
+      font: 13px inherit;
+      font-family: inherit;
+      cursor: pointer;
+      transition: .2s
+    }
+
+    .chip:hover {
+      border-color: var(--acc);
+      color: var(--acc);
+      transform: translateY(-2px)
+    }
+
+    .state {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--dim);
+      margin-bottom: 8px
+    }
+
+    .state span b {
+      color: var(--mint)
+    }
+
+    .dm input {
+      width: 100%;
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: var(--txt);
+      font: 14px inherit;
+      font-family: inherit
+    }
+
+    /* features */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 16px
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 22px;
+      transition: transform .15s, border-color .2s;
+      transform-style: preserve-3d
+    }
+
+    .card:hover {
+      border-color: var(--acc)
+    }
+
+    .card i {
+      font-style: normal;
+      font-size: 26px;
+      display: block;
+      margin-bottom: 8px
+    }
+
+    .card h3 {
+      font-size: 17px;
+      margin-bottom: 4px
+    }
+
+    .card p {
+      color: var(--dim);
+      font-size: 14px
+    }
+
+    /* steps */
+    .prog {
+      height: 6px;
+      background: var(--panel2);
+      border-radius: 9px;
+      margin-bottom: 24px;
+      overflow: hidden
+    }
+
+    .prog div {
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, var(--acc), var(--mint));
+      transition: .4s
+    }
+
+    .step {
+      display: flex;
+      gap: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 14px;
+      transition: .3s
+    }
+
+    .step.done {
+      border-color: var(--mint);
+      opacity: .75
+    }
+
+    .step .n {
+      flex: none;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: var(--panel2);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      color: var(--acc);
+      cursor: pointer;
+      border: 1px solid var(--line)
+    }
+
+    .step.done .n {
+      background: var(--mint);
+      color: #04101a
+    }
+
+    .step h3 {
+      font-size: 17px
+    }
+
+    .step p {
+      color: var(--dim);
+      font-size: 14px;
+      margin: 4px 0 10px
+    }
+
+    code {
+      background: var(--panel2);
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-family: Consolas, monospace;
+      font-size: 14px;
+      color: var(--mint);
+      display: inline-block
+    }
+
+    .cmd {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap
+    }
+
+    .copy {
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      color: var(--txt);
+      border-radius: 8px;
+      padding: 7px 12px;
+      cursor: pointer;
+      font: 12px inherit;
+      font-family: inherit
+    }
+
+    .copy:hover {
+      border-color: var(--acc)
+    }
+
+    .note {
+      font-size: 13px;
+      color: var(--dim);
+      border-left: 3px solid var(--line);
+      padding-left: 12px;
+      margin-top: 10px
+    }
+
+    footer {
+      border-top: 1px solid var(--line);
+      padding: 30px 0;
+      color: var(--dim);
+      font-size: 13px;
+      text-align: center
+    }
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translate(-50%, 90px);
+      background: var(--panel2);
+      border: 1px solid var(--acc);
+      padding: 12px 20px;
+      border-radius: 12px;
+      transition: .4s;
+      z-index: 50;
+      font-size: 14px;
+      max-width: 90vw
+    }
+
+    #toast.on {
+      transform: translate(-50%, 0)
+    }
+
+    @media(max-width:800px) {
+      .demo {
+        grid-template-columns: 1fr
+      }
+
+      .hero canvas {
+        height: 320px
+      }
+
+      nav a.h {
+        display: none
+      }
+    }
+
+    @media(prefers-reduced-motion:reduce) {
+      * {
+        transition: none !important
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <nav>
+    <div class="wrap"><b><img src="jarvis_logo.png" alt="">J.A.R.V.I.S</b>
+      <a class="h" href="#demo">Demo</a><a class="h" href="#features">Features</a><a class="h"
+        href="#install">Install</a>
+      <a class="btn pri" style="padding:8px 18px;font-size:13px" href="#install">Download</a>
+    </div>
+  </nav>
+
+  <header class="hero wrap">
+    <span class="badge">v1.0.0 · for Windows</span>
+    <canvas id="heroOrb"></canvas>
+    <h1>J.A.R.V.I.S</h1>
+    <p>A voice assistant that lives on your PC. Say its name once, then just talk. It opens your apps, searches, plays
+      music, and answers questions with a local AI.</p>
+    <div class="row"><button class="btn pri" onclick="download()">⬇ Download v1.0.0</button><a class="btn sec"
+        href="#demo">Try the demo</a></div>
+    <div class="hint">Move your mouse over the orb · click it to make it talk</div>
+  </header>
+
+  <section id="demo">
+    <div class="wrap reveal">
+      <h2>Talk to it</h2>
+      <p class="sub">This is a simulated demo of how Jarvis behaves. Pick a command, or type your own. In the real app
+        you just speak.</p>
+      <div class="demo">
+        <div><canvas id="demoOrb"></canvas></div>
+        <div class="dm">
+          <div class="state"><span>Mode: <b id="mode">Waiting for “Jarvis”</b></span><span id="st">idle</span></div>
+          <div class="log" id="log">
+            <div class="sys">Pick a command below to begin.</div>
+          </div>
+          <div class="chips" id="chips"></div>
+          <input id="inp" placeholder="Or type something and press Enter…" autocomplete="off">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap reveal">
+      <h2>Built to feel modern</h2>
+      <p class="sub">Everything runs on your computer, and you stay in control.</p>
+      <div class="grid">
+        <div class="card"><i>🎙️</i>
+          <h3>Real conversations</h3>
+          <p>Say “Jarvis” once, then keep talking. Say “thank you” to end the chat, or “Jarvis stop” to turn it off.</p>
+        </div>
+        <div class="card"><i>🚀</i>
+          <h3>Opens any app</h3>
+          <p>“Jarvis open Roblox.” It searches your Start menu, including Store apps, and launches what you ask for.</p>
+        </div>
+        <div class="card"><i>🧠</i>
+          <h3>Local AI brain</h3>
+          <p>Powered by Ollama running on your own PC. No account, no API key, no usage limits.</p>
+        </div>
+        <div class="card"><i>🔮</i>
+          <h3>Living orb</h3>
+          <p>A ball of dots that reacts when Jarvis listens, thinks, and speaks. Switch to chat view any time.</p>
+        </div>
+        <div class="card"><i>🎚️</i>
+          <h3>Pick your mic</h3>
+          <p>Choose your external microphone from a dropdown. Jarvis remembers it next time.</p>
+        </div>
+        <div class="card"><i>🧩</i>
+          <h3>Modules</h3>
+          <p>A side panel with room to grow: clock, last heard, and slots for new widgets.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap reveal">
+      <h2>Get Jarvis in 4 steps</h2>
+      <p class="sub">Click a number to check it off. Takes about 10 minutes, mostly downloading.</p>
+      <div class="prog">
+        <div id="bar"></div>
+      </div>
+
+      <div class="step">
+        <div class="n">1</div>
+        <div>
+          <h3>Install Ollama</h3>
+          <p>Ollama runs the AI on your PC. It’s free.</p>
+          <a class="btn pri" style="padding:9px 18px;font-size:14px" href="https://ollama.com/download" target="_blank"
+            rel="noopener">Get Ollama ↗</a>
+          <a class="btn sec" style="padding:9px 18px;font-size:14px" href="https://ollama.com" target="_blank"
+            rel="noopener">ollama.com</a>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="n">2</div>
+        <div>
+          <h3>Download the AI model</h3>
+          <p>Open Command Prompt and run this once (about 2 GB):</p>
+          <div class="cmd"><code>ollama pull llama3.2</code><button class="copy"
+              data-c="ollama pull llama3.2">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="n">3</div>
+        <div>
+          <h3>Download Jarvis</h3>
+          <p>Version 1.0.0 for Windows, a single .exe file.</p>
+          <button class="btn pri" style="padding:9px 18px;font-size:14px" onclick="download()">⬇ Download
+            Jarvis.exe</button>
+          <div class="note">Windows may show “Windows protected your PC” because the app isn’t code-signed. Click
+            <b>More info</b>, then <b>Run anyway</b>.</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="n">4</div>
+        <div>
+          <h3>Run it and say “Jarvis”</h3>
+          <p>Open Jarvis.exe, pick your microphone, press <b>START</b>, and try “Jarvis, open Notepad.”</p>
+          <div class="note">Heads up: speech recognition uses Google’s free speech service, so your mic audio is sent
+            there while Jarvis is on. Press STOP when you don’t want it listening.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">J.A.R.V.I.S v1.0.0 · Windows 10/11 · Made by Kavish</div>
+  </footer>
+  <div id="toast"></div>
+
+  <script>
+    // ====== EDIT THIS: link to your release file (GitHub > Releases > upload Jarvis.exe) ======
+    const DOWNLOAD_URL = "https://github.com/YOUR-USERNAME/jarvis/releases/download/v1.0.0/Jarvis.exe";
+    // ===========================================================================================
+
+    const $ = s => document.querySelector(s);
+    function toast(t) { const e = $("#toast"); e.textContent = t; e.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove("on"), 4200) }
+    function download() { toast("Download starting. If Windows warns you, choose More info → Run anyway."); setTimeout(() => { location.href = DOWNLOAD_URL }, 900) }
+
+    /* ---------- orb ---------- */
+    function makeOrb(cv, opts) {
+      const ctx = cv.getContext("2d"), N = 240, G = Math.PI * (3 - Math.sqrt(5)), P = [];
+      for (let i = 0; i < N; i++) { const y = 1 - i / (N - 1) * 2, r = Math.sqrt(1 - y * y); P.push([Math.cos(G * i) * r, y, Math.sin(G * i) * r]) }
+      const COL = { idle: [0, 212, 255], listen: [94, 255, 208], think: [255, 179, 71], speak: [0, 229, 255], off: [59, 76, 107] };
+      const o = { state: "idle", level: 0, ang: 0, t: 0, rgb: COL.idle.slice(), mx: 0, my: 0, ripples: [], lastR: 0, set(s) { o.state = s } };
+      function fit() { const d = devicePixelRatio || 1, r = cv.getBoundingClientRect(); cv.width = r.width * d; cv.height = r.height * d; ctx.setTransform(d, 0, 0, d, 0, 0) }
+      addEventListener("resize", fit); fit();
+      if (opts.mouse) cv.addEventListener("mousemove", e => { const r = cv.getBoundingClientRect(); o.mx = (e.clientX - r.left) / r.width - .5; o.my = (e.clientY - r.top) / r.height - .5 });
+      function frame() {
+        const w = cv.clientWidth, h = cv.clientHeight, s = o.state; o.t += .033; const t = o.t;
+        const base = { idle: .05, listen: .12, think: .1, speak: .24, off: 0 }[s] || .05;
+        let tg = base + .03 * Math.sin(t * 2);
+        if (s === "speak") tg += .3 * Math.abs(Math.sin(t * 9) * Math.sin(t * 3.3 + 1)) + .1 * Math.random();
+        if (s === "think") tg += .08 * Math.sin(t * 10);
+        o.level += (tg - o.level) * .2; const L = Math.max(0, o.level);
+        const c = COL[s] || COL.idle; for (let i = 0; i < 3; i++)o.rgb[i] += (c[i] - o.rgb[i]) * .08;
+        o.ang += ({ think: .04, speak: .014, off: .003 }[s] || .008) + o.mx * .02;
+        ctx.clearRect(0, 0, w, h);
+        const cx = w / 2, cy = h / 2, R = Math.min(w, h) * .3 * (1 + L * .25), rgb = o.rgb, rs = (a) => `rgba(${rgb[0] | 0},${rgb[1] | 0},${rgb[2] | 0},${a})`;
+        const g = ctx.createRadialGradient(cx, cy, R * .3, cx, cy, R * 2.2); g.addColorStop(0, rs(.18 + L * .3)); g.addColorStop(1, rs(0));
+        ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+        ctx.lineWidth = 3;[[1.5, 4, 70, 0, .8], [1.5, 4, 40, 180, .8], [1.7, -2.5, 110, 0, .35], [1.7, -2.5, 50, 180, .35]].forEach(a => {
+          const st = (o.ang * 180 / Math.PI * a[1] + a[3]) * Math.PI / 180; ctx.strokeStyle = rs(a[4]); ctx.beginPath(); ctx.arc(cx, cy, R * a[0], st, st + a[2] * Math.PI / 180); ctx.stroke()
+        });
+        if (s === "speak" && t - o.lastR > .55) { o.ripples.push(t); o.lastR = t }
+        o.ripples = o.ripples.filter(b => t - b < 1.6); ctx.lineWidth = 2;
+        o.ripples.forEach(b => { const a = t - b; ctx.strokeStyle = rs((1 - a / 1.6) * .6); ctx.beginPath(); ctx.arc(cx, cy, R * (1.15 + a * .75), 0, 7); ctx.stroke() });
+        const ca = Math.cos(o.ang), sa = Math.sin(o.ang), tl = .4 + o.my * .8, ct = Math.cos(tl), st2 = Math.sin(tl), pr = [];
+        P.forEach((p, i) => {
+          const wob = 1 + L * (s === "speak" ? .3 : .12) * Math.sin(t * (s === "speak" ? 6 : 3) + i * .8);
+          const x1 = p[0] * ca + p[2] * sa, z1 = -p[0] * sa + p[2] * ca, y1 = p[1] * ct - z1 * st2, z2 = p[1] * st2 + z1 * ct, k = 3 / (3 - z2);
+          pr.push([z2, cx + x1 * R * wob * k, cy + y1 * R * wob * k])
+        });
+        pr.sort((a, b) => a[0] - b[0]);
+        pr.forEach(q => { const d = (q[0] + 1) / 2, sz = 1 + 2.6 * d + L * 1.6 * d; ctx.fillStyle = rs(.2 + .8 * d); ctx.beginPath(); ctx.arc(q[1], q[2], sz, 0, 7); ctx.fill() });
+        if (opts.bars) {
+          const by = h - 26, n = 31, gp = Math.min(14, w / 50); ctx.lineWidth = 4; ctx.lineCap = "round";
+          for (let i = 0; i < n; i++) {
+            const d = i - (n >> 1), env = 1 - Math.abs(d) / (n / 2 + 1), hh = 3 + env * L * 120 * (.5 + .5 * Math.abs(Math.sin(t * 7 + i * .6)));
+            ctx.strokeStyle = rs(.35 + .65 * env); ctx.beginPath(); ctx.moveTo(cx + d * gp, by - hh); ctx.lineTo(cx + d * gp, by + hh); ctx.stroke()
+          }
+        }
+        requestAnimationFrame(frame)
+      }
+      frame(); return o;
+    }
+
+    const hero = makeOrb($("#heroOrb"), { mouse: true });
+    $("#heroOrb").addEventListener("click", () => { hero.set("speak"); setTimeout(() => hero.set("idle"), 2200) });
+    const demoOrb = makeOrb($("#demoOrb"), { bars: true });
+
+    /* ---------- simulated demo ---------- */
+    const log = $("#log"); let convo = false, off = false, busy = false;
+    const jokes = ["Why do programmers prefer dark mode? Because light attracts bugs.", "I would tell you a UDP joke, but you might not get it.", "There are 10 kinds of people: those who understand binary and those who don’t."];
+    const cmds = [
+      ["Jarvis, open Spotify", () => "Opening Spotify."],
+      ["What time is it?", () => "It’s " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + "."],
+      ["Tell me a joke", () => jokes[Math.random() * jokes.length | 0]],
+      ["Search for Gorilla Tag mods", () => "Searching for Gorilla Tag mods."],
+      ["Thank you", () => "You’re welcome.", "end"],
+      ["Jarvis stop", () => "Shutting down. Goodbye.", "stop"]
+    ];
+    function add(cls, txt) { const d = document.createElement("div"); d.className = cls; d.textContent = txt; log.appendChild(d); log.scrollTop = log.scrollHeight; return d }
+    function setMode() { $("#mode").textContent = off ? "Offline" : convo ? "In conversation" : "Waiting for “Jarvis”"; $("#st").textContent = off ? "offline" : demoOrb.state }
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    async function run(text, fn, kind) {
+      if (busy) return; busy = true;
+      if (off) { off = false; add("sys", "— Jarvis restarted —") }
+      const lower = text.toLowerCase();
+      if (!convo && !/\bjarvis\b/.test(lower)) { add("you", "You: " + text); add("sys", "Jarvis didn’t hear its name, so it stays quiet. Start with “Jarvis…”"); busy = false; return }
+      convo = true; demoOrb.set("listen"); setMode();
+      const y = add("you", "You: "); for (const ch of text) { y.textContent += ch; await sleep(22) }
+      await sleep(250); demoOrb.set("think"); setMode(); await sleep(650);
+      const reply = fn ? fn() : "In the real app, my local AI would answer that for you.";
+      demoOrb.set("speak"); setMode(); const j = add("jv", "Jarvis: ");
+      for (const ch of reply) { j.textContent += ch; await sleep(28) }
+      await sleep(300);
+      if (kind === "end") { convo = false; add("sys", "— conversation ended —") }
+      if (kind === "stop") { convo = false; off = true; demoOrb.set("off"); setMode(); busy = false; return }
+      demoOrb.set(convo ? "listen" : "idle"); setMode(); busy = false;
+    }
+    cmds.forEach(c => { const b = document.createElement("button"); b.className = "chip"; b.textContent = c[0]; b.onclick = () => run(c[0], c[1], c[2]); $("#chips").appendChild(b) });
+    $("#inp").addEventListener("keydown", e => {
+      if (e.key === "Enter" && e.target.value.trim()) {
+        const v = e.target.value.trim(); e.target.value = "";
+        const m = cmds.find(c => v.toLowerCase().includes(c[0].toLowerCase().replace("jarvis, ", ""))); run(v, m ? m[1] : null, m && m[2])
+      }
+    });
+
+    /* ---------- reveal, tilt, copy, checklist ---------- */
+    const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) e.target.classList.add("in") }), { threshold: .12 });
+    document.querySelectorAll(".reveal").forEach(e => io.observe(e));
+    document.querySelectorAll(".card").forEach(c => {
+      c.addEventListener("mousemove", e => { const r = c.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5; c.style.transform = `perspective(600px) rotateY(${x * 10}deg) rotateX(${-y * 10}deg) translateY(-3px)` });
+      c.addEventListener("mouseleave", () => c.style.transform = "")
+    });
+    document.querySelectorAll(".copy").forEach(b => b.onclick = () => { navigator.clipboard.writeText(b.dataset.c).then(() => { b.textContent = "Copied!"; setTimeout(() => b.textContent = "Copy", 1400) }).catch(() => toast("Select the text and press Ctrl+C")) });
+    const steps = [...document.querySelectorAll(".step")]; let saved = [];
+    try { saved = JSON.parse(localStorage.getItem("jarvisSteps") || "[]") } catch (e) { }
+    function upd() {
+      $("#bar").style.width = steps.filter(s => s.classList.contains("done")).length / steps.length * 100 + "%";
+      try { localStorage.setItem("jarvisSteps", JSON.stringify(steps.map((s, i) => s.classList.contains("done") ? i : -1).filter(i => i >= 0))) } catch (e) { }
+    }
+    steps.forEach((s, i) => {
+      if (saved.includes(i)) s.classList.add("done"); s.querySelector(".n").onclick = () => {
+        s.classList.toggle("done"); upd();
+        if (steps.every(x => x.classList.contains("done"))) { hero.set("speak"); setTimeout(() => hero.set("idle"), 2500); toast("All set! Say “Jarvis” 🎉") }
+      }
+    });
+    upd();
+  </script>
+</body>
+
+</html>
