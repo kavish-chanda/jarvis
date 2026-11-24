@@ -69,7 +69,7 @@ APP_OVERRIDES = {
 QUICK_LAUNCH = ["Chrome", "Spotify", "Discord", "Steam", "Notepad", "Calculator"]
 
 CREATOR_NAME = "Kavish Chanda"
-CREATOR_URL = "https://github.com/YOUR-USERNAME"   # <-- put your GitHub (or portfolio) link here
+CREATOR_URL = "https://github.com/kavish-chanda"   # <-- put your GitHub (or portfolio) link here
 CREATOR_LINK_NAME = "GitHub page"
 
 SYSTEM_PROMPT = (
