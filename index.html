@@ -507,6 +507,7 @@
           </div>
           <div class="chips" id="chips"></div>
           <input id="inp" placeholder="Or type something and press Enter…" autocomplete="off">
+          <button class="chip" id="vt" style="margin-top:12px">🔊 Voice on</button>
         </div>
       </div>
     </div>
@@ -524,6 +525,11 @@
         <div class="card"><i>🚀</i>
           <h3>Opens any app</h3>
           <p>“Jarvis open Roblox.” It searches your Start menu, including Store apps, and launches what you ask for.</p>
+        </div>
+        <div class="card"><i>🛠️</i>
+          <h3>Gets things done</h3>
+          <p>Weather, timers, math, volume and music controls, Wikipedia lookups, closing apps. The AI picks the right
+            tool on its own.</p>
         </div>
         <div class="card"><i>🧠</i>
           <h3>Local AI brain</h3>
@@ -569,9 +575,9 @@
         <div class="n">2</div>
         <div>
           <h3>Download the AI model</h3>
-          <p>Open Command Prompt and run this once (about 2 GB):</p>
-          <div class="cmd"><code>ollama pull llama3.2</code><button class="copy"
-              data-c="ollama pull llama3.2">Copy</button></div>
+          <p>Open Command Prompt and run this once (about 5 GB):</p>
+          <div class="cmd"><code>ollama pull llama3.1:8b</code><button class="copy"
+              data-c="ollama pull llama3.1:8b">Copy</button></div>
         </div>
       </div>
 
@@ -607,6 +613,7 @@
   <script>
     // ====== EDIT THIS: link to your release file (GitHub > Releases > upload Jarvis.exe) ======
     const DOWNLOAD_URL = "https://github.com/kavish-chanda/jarvis/releases/download/v1.0.0/Jarvis.exe";
+    const GITHUB_URL = "https://github.com/kavish-chanda";   // opened by the "who created you" demo
     // ===========================================================================================
 
     const $ = s => document.querySelector(s);
@@ -662,11 +669,30 @@
     }
 
     const hero = makeOrb($("#heroOrb"), { mouse: true });
-    $("#heroOrb").addEventListener("click", () => { hero.set("speak"); setTimeout(() => hero.set("idle"), 2200) });
+    $("#heroOrb").addEventListener("click", async () => {
+      hero.set("speak");
+      await Promise.all([say("Hello, I am Jarvis. Say my name once, then just start talking."), new Promise(r => setTimeout(r, 2400))]); hero.set("idle")
+    });
     const demoOrb = makeOrb($("#demoOrb"), { bars: true });
 
+    /* ---------- voice (browser text-to-speech) ---------- */
+    let voiceOn = true, voice = null;
+    const canSpeak = "speechSynthesis" in window;
+    function pickVoice() {
+      const v = speechSynthesis.getVoices();
+      voice = v.find(x => /^en/i.test(x.lang) && /(Google UK English Male|David|Guy|Daniel|Mark|Alex)/i.test(x.name)) || v.find(x => /^en/i.test(x.lang)) || null
+    }
+    if (canSpeak) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice }
+    function say(t) {
+      return new Promise(res => {
+        if (!voiceOn || !canSpeak) { res(); return }
+        speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); if (voice) u.voice = voice; u.rate = 1.02; u.pitch = .9;
+        u.onend = u.onerror = () => res(); speechSynthesis.speak(u)
+      })
+    }
+
     /* ---------- simulated demo ---------- */
-    const log = $("#log"); let convo = false, off = false, busy = false;
+    const log = $("#log"); let convo = false, off = false, busy = false, pending = false;
     const jokes = ["Why do programmers prefer dark mode? Because light attracts bugs.", "I would tell you a UDP joke, but you might not get it.", "There are 10 kinds of people: those who understand binary and those who don’t."];
     const cmds = [
       ["Jarvis, open Spotify", () => "Opening Spotify."],
@@ -674,23 +700,27 @@
       ["Tell me a joke", () => jokes[Math.random() * jokes.length | 0]],
       ["Search for Gorilla Tag mods", () => "Searching for Gorilla Tag mods."],
       ["Thank you", () => "You’re welcome.", "end"],
-      ["Jarvis stop", () => "Shutting down. Goodbye.", "stop"]
+      ["Jarvis stop", () => "Shutting down. Goodbye.", "stop"],
+      ["Jarvis, who created you?", () => "I was created by Kavish Chanda. Would you like me to open his GitHub page?", "ask"],
+      ["Yes, open it", () => "Opening it now.", "yes"]
     ];
     function add(cls, txt) { const d = document.createElement("div"); d.className = cls; d.textContent = txt; log.appendChild(d); log.scrollTop = log.scrollHeight; return d }
     function setMode() { $("#mode").textContent = off ? "Offline" : convo ? "In conversation" : "Waiting for “Jarvis”"; $("#st").textContent = off ? "offline" : demoOrb.state }
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     async function run(text, fn, kind) {
-      if (busy) return; busy = true;
+      if (busy) return; busy = true; const wasP = pending; if (kind === "yes") pending = false;
       if (off) { off = false; add("sys", "— Jarvis restarted —") }
       const lower = text.toLowerCase();
       if (!convo && !/\bjarvis\b/.test(lower)) { add("you", "You: " + text); add("sys", "Jarvis didn’t hear its name, so it stays quiet. Start with “Jarvis…”"); busy = false; return }
       convo = true; demoOrb.set("listen"); setMode();
       const y = add("you", "You: "); for (const ch of text) { y.textContent += ch; await sleep(22) }
       await sleep(250); demoOrb.set("think"); setMode(); await sleep(650);
-      const reply = fn ? fn() : "In the real app, my local AI would answer that for you.";
-      demoOrb.set("speak"); setMode(); const j = add("jv", "Jarvis: ");
+      const reply = (kind === "yes" && !wasP) ? "Sure. What would you like me to do?" : (fn ? fn() : "In the real app, my local AI would answer that for you.");
+      demoOrb.set("speak"); setMode(); const j = add("jv", "Jarvis: "), spoken = say(reply);
       for (const ch of reply) { j.textContent += ch; await sleep(28) }
-      await sleep(300);
+      await spoken; await sleep(200);
+      if (kind === "ask") pending = true;
+      if (kind === "yes" && wasP) { const l = add("sys", ""), a = document.createElement("a"); a.href = GITHUB_URL; a.target = "_blank"; a.rel = "noopener"; a.textContent = "Open Kavish’s GitHub ↗"; l.appendChild(a) }
       if (kind === "end") { convo = false; add("sys", "— conversation ended —") }
       if (kind === "stop") { convo = false; off = true; demoOrb.set("off"); setMode(); busy = false; return }
       demoOrb.set(convo ? "listen" : "idle"); setMode(); busy = false;
@@ -699,9 +729,14 @@
     $("#inp").addEventListener("keydown", e => {
       if (e.key === "Enter" && e.target.value.trim()) {
         const v = e.target.value.trim(); e.target.value = "";
-        const m = cmds.find(c => v.toLowerCase().includes(c[0].toLowerCase().replace("jarvis, ", ""))); run(v, m ? m[1] : null, m && m[2])
+        const t = v.toLowerCase(); let m = cmds.find(c => t.includes(c[0].toLowerCase().replace("jarvis, ", "")));
+        if (!m && /who (made|created|built)|your creator/.test(t)) m = cmds[6];
+        if (!m && pending && /\b(yes|yeah|sure|ok|okay)\b/.test(t)) m = cmds[7];
+        run(v, m ? m[1] : null, m && m[2])
       }
     });
+    $("#vt").onclick = () => { voiceOn = !voiceOn; $("#vt").textContent = voiceOn ? "🔊 Voice on" : "🔇 Voice off"; if (!voiceOn && canSpeak) speechSynthesis.cancel() };
+    if (!canSpeak) { $("#vt").style.display = "none" }
 
     /* ---------- reveal, tilt, copy, checklist ---------- */
     const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) e.target.classList.add("in") }), { threshold: .12 });
