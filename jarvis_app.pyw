@@ -135,9 +135,9 @@ STATE_CFG = {
 
 
 # ======================= TOOLS (what the AI can do) =======================
-def _tool(name, desc, **props):
+def _tool(tool_name, tool_desc, /, **props):
     return {"type": "function", "function": {
-        "name": name, "description": desc,
+        "name": tool_name, "description": tool_desc,
         "parameters": {"type": "object",
                        "properties": {k: {"type": v[0], "description": v[1]} for k, v in props.items()},
                        "required": list(props)}}}
