@@ -1,0 +1,180 @@
+{
+ "modules": [
+  {
+   "id": "pomodoro",
+   "name": "Focus Timer",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "pomodoro.py",
+   "description": "Pomodoro focus timer card with voice control."
+  },
+  {
+   "id": "crypto",
+   "name": "Crypto Prices",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "crypto.py",
+   "description": "Live Bitcoin, Ethereum and Solana prices, plus a voice tool for any coin."
+  },
+  {
+   "id": "news",
+   "name": "News Headlines",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "news.py",
+   "description": "Top world headlines card. Say: what is the news?"
+  },
+  {
+   "id": "todo",
+   "name": "To-Do List",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "todo.py",
+   "description": "A saved to-do list you can fill by voice or by typing."
+  },
+  {
+   "id": "converter",
+   "name": "Currency Converter",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "converter.py",
+   "description": "Live currency conversion. Say: convert 100 USD to EUR."
+  },
+  {
+   "id": "screenshot",
+   "name": "Screenshot",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "screenshot.py",
+   "description": "Capture your screen by voice or button. Saves to Pictures/Jarvis."
+  },
+  {
+   "id": "clipboard",
+   "name": "Clipboard History",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "clipboard.py",
+   "description": "Remembers your last 5 copied texts. Click to copy again."
+  },
+  {
+   "id": "fun",
+   "name": "Fun Pack",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "fun.py",
+   "description": "Random fun facts, coin flips and dice rolls."
+  },
+  {
+   "id": "dictionary",
+   "name": "Dictionary",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "dictionary.py",
+   "description": "Word definitions by voice or typing. Say: define serendipity."
+  },
+  {
+   "id": "quotes",
+   "name": "Daily Quotes",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "quotes.py",
+   "description": "Inspirational quotes card. Say: inspire me."
+  },
+  {
+   "id": "space",
+   "name": "ISS Tracker",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "space.py",
+   "description": "Live Space Station position and who is in space right now."
+  },
+  {
+   "id": "power",
+   "name": "Power & Network",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "power.py",
+   "description": "Battery level, local IP and live ping."
+  },
+  {
+   "id": "trivia",
+   "name": "Trivia",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "trivia.py",
+   "description": "Trivia game. Say: quiz me. Jarvis asks, then reveals the answer."
+  },
+  {
+   "id": "scenes",
+   "name": "Scenes",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "scenes.py",
+   "description": "Open a group of apps with one command. Save gaming: steam, discord, then say start gaming mode."
+  },
+  {
+   "id": "countdown",
+   "name": "Countdowns",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "countdown.py",
+   "description": "Days until your events. Ask: how many days until winter break?"
+  },
+  {
+   "id": "reminders",
+   "name": "Health Reminders",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "reminders.py",
+   "description": "Spoken reminders to drink water, stretch and rest your eyes."
+  },
+  {
+   "id": "password",
+   "name": "Password Maker",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "password.py",
+   "description": "Makes a strong password and copies it to the clipboard. Never read aloud."
+  },
+  {
+   "id": "translate",
+   "name": "Translator",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "translate.py",
+   "description": "Translate text. Say: how do you say good morning in Spanish."
+  },
+  {
+   "id": "units",
+   "name": "Unit Converter",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "units.py",
+   "description": "Length, weight, volume, speed and temperature. Say: convert 5 miles to km."
+  },
+  {
+   "id": "forecast",
+   "name": "3-Day Forecast",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "forecast.py",
+   "description": "Weather forecast with sunrise, sunset and moon phase."
+  },
+  {
+   "id": "github",
+   "name": "GitHub Stats",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "github.py",
+   "description": "Repos, followers and stars for a GitHub user."
+  },
+  {
+   "id": "files",
+   "name": "File Finder",
+   "version": "1.0",
+   "author": "Kavish",
+   "file": "files.py",
+   "description": "Find and open documents, pictures and videos. Say: find file homework."
+  }
+ ]
+}

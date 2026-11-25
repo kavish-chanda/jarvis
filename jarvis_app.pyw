@@ -32,12 +32,15 @@ import webbrowser
 import ast
 import ctypes
 import shutil
+import importlib.util
+import xml.etree.ElementTree  # bundled so store modules can parse RSS feeds
+import html, secrets, socket, string  # bundled for store modules
 import operator
 import urllib.error
 import urllib.parse
 import urllib.request
 import tkinter as tk
-from tkinter import scrolledtext
+from tkinter import scrolledtext, messagebox
 
 import speech_recognition as sr
 import pyttsx3
@@ -93,18 +96,37 @@ PROTECTED = {"explorer", "winlogon", "csrss", "wininit", "services", "lsass",
 SCRIPT_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 SETTINGS_DIR = os.path.join(os.environ.get("APPDATA", SCRIPT_DIR), "Jarvis")
 SETTINGS_PATH = os.path.join(SETTINGS_DIR, "jarvis_settings.json")
+MODULES_DIR = os.path.join(SETTINGS_DIR, "modules")      # installed store modules live here
+# Optional online catalog (your GitHub). The bundled "store" folder always works offline.
+STORE_URL = "https://raw.githubusercontent.com/kavish-chanda/jarvis/main/store/store.json"
 LOGO_PNG = os.path.join(SCRIPT_DIR, "jarvis_logo.png")
 LOGO_ICO = os.path.join(SCRIPT_DIR, "jarvis_logo.ico")
 
-# Colors
-BG = "#070b14"
-PANEL = "#0d1424"
-PANEL2 = "#131d33"
-BORDER = "#1c2a48"
-ACCENT = "#00d4ff"
-TEXT = "#d6e4ff"
-DIM = "#7a8aa8"
-RED = "#ff4d5e"
+# Colors / themes (pick one in the app; applies after a restart)
+THEMES = {
+    "Stark Cyan": dict(BG="#040810", PANEL="#08111e", PANEL2="#0c1a2b", BORDER="#0f4a6b", ACCENT="#00e1ff",
+                       OK="#5effd0", WARN="#ffb347", TEXT="#d6f4ff", DIM="#6f8fa8", RED="#ff4d5e"),
+    "Iron Red": dict(BG="#0b0405", PANEL="#150909", PANEL2="#1e0e0f", BORDER="#6e1c1c", ACCENT="#ffb000",
+                     OK="#ffd54a", WARN="#ff7a30", TEXT="#ffe9c9", DIM="#a07a60", RED="#ff3b3b"),
+    "Matrix": dict(BG="#020a04", PANEL="#05120a", PANEL2="#081a0f", BORDER="#0e5a2a", ACCENT="#00ff6a",
+                   OK="#a6ff00", WARN="#ffe14a", TEXT="#d2ffe2", DIM="#5f9a75", RED="#ff4d5e"),
+}
+
+
+def _saved_theme():
+    try:
+        with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
+            return json.load(f).get("theme", "Stark Cyan")
+    except Exception:
+        return "Stark Cyan"
+
+
+THEME_NAME = _saved_theme()
+if THEME_NAME not in THEMES:
+    THEME_NAME = "Stark Cyan"
+_T = THEMES[THEME_NAME]
+BG, PANEL, PANEL2, BORDER, ACCENT, OK, WARN, TEXT, DIM, RED = (
+    _T[k] for k in ("BG", "PANEL", "PANEL2", "BORDER", "ACCENT", "OK", "WARN", "TEXT", "DIM", "RED"))
 # ======================================================
 
 
@@ -123,14 +145,15 @@ def mix(c1, c2, t):
 
 
 BG_RGB = hex_to_rgb(BG)
+ACCENT_RGB = hex_to_rgb(ACCENT)
 
 # How the orb looks in each state
 STATE_CFG = {
-    "offline":      {"speed": 0.003, "base": 0.00, "color": hex_to_rgb("#3b4c6b")},
-    "idle":         {"speed": 0.007, "base": 0.05, "color": hex_to_rgb("#00d4ff")},
-    "conversation": {"speed": 0.011, "base": 0.10, "color": hex_to_rgb("#5effd0")},
-    "thinking":     {"speed": 0.040, "base": 0.10, "color": hex_to_rgb("#ffb347")},
-    "speaking":     {"speed": 0.014, "base": 0.22, "color": hex_to_rgb("#00e5ff")},
+    "offline":      {"speed": 0.003, "base": 0.00, "color": hex_to_rgb(DIM)},
+    "idle":         {"speed": 0.007, "base": 0.05, "color": hex_to_rgb(ACCENT)},
+    "conversation": {"speed": 0.011, "base": 0.10, "color": hex_to_rgb(OK)},
+    "thinking":     {"speed": 0.040, "base": 0.10, "color": hex_to_rgb(WARN)},
+    "speaking":     {"speed": 0.014, "base": 0.22, "color": hex_to_rgb(ACCENT)},
 }
 
 
@@ -203,9 +226,9 @@ def press_key(vk, times=1):
         ctypes.windll.user32.keybd_event(vk, 0, 2, 0)
 
 
-# ======================= ORB =======================
+# ======================= ORB (Stark HUD) =======================
 class Orb(tk.Canvas):
-    """Rotating sphere of dots + rings + voice bars. Reacts to Jarvis's state."""
+    """Reactor rings, radar sweep, dot sphere, voice bars. Reacts to Jarvis's state."""
 
     def __init__(self, master, app):
         super().__init__(master, bg=BG, highlightthickness=0)
@@ -216,7 +239,7 @@ class Orb(tk.Canvas):
         self.rgb = STATE_CFG["offline"]["color"]
         self.ripples = []
         self.last_ripple = 0.0
-
+        self.size = (0, 0)
         n = 230
         golden = math.pi * (3 - math.sqrt(5))
         self.points = []
@@ -225,7 +248,6 @@ class Orb(tk.Canvas):
             r = math.sqrt(1 - y * y)
             th = golden * i
             self.points.append((math.cos(th) * r, y, math.sin(th) * r))
-
         self.after(33, self.tick)
 
     def tick(self):
@@ -235,6 +257,36 @@ class Orb(tk.Canvas):
             pass
         self.after(33, self.tick)
 
+    def draw_static(self):
+        """Hex grid, corner brackets and edge rulers. Drawn once per window size."""
+        self.delete("static")
+        w, h = self.winfo_width(), self.winfo_height()
+        self.size = (w, h)
+        if w < 80 or h < 80:
+            return
+        grid = rgb_to_hex(mix(BG_RGB, ACCENT_RGB, 0.08))
+        r = 30
+        dx = r * 1.732
+        for row in range(int(h / (r * 1.5)) + 2):
+            for col in range(int(w / dx) + 2):
+                cx = col * dx + (dx / 2 if row % 2 else 0)
+                cy = row * r * 1.5
+                pts = []
+                for k in range(6):
+                    a = math.radians(60 * k + 30)
+                    pts += [cx + r * 0.94 * math.cos(a), cy + r * 0.94 * math.sin(a)]
+                self.create_polygon(pts, outline=grid, fill="", tags="static")
+        br = rgb_to_hex(mix(BG_RGB, ACCENT_RGB, 0.85))
+        m, ln = 22, 64
+        for x, y, sx, sy in ((m, m, 1, 1), (w - m, m, -1, 1), (m, h - m, 1, -1), (w - m, h - m, -1, -1)):
+            self.create_line(x, y + sy * ln, x, y, x + sx * ln, y, fill=br, width=3, tags="static")
+        ruler = rgb_to_hex(mix(BG_RGB, ACCENT_RGB, 0.4))
+        for i, y in enumerate(range(120, h - 120, 14)):
+            size = 12 if i % 5 == 0 else 5
+            self.create_line(m, y, m + size, y, fill=ruler, tags="static")
+            self.create_line(w - m, y, w - m - size, y, fill=ruler, tags="static")
+        self.tag_lower("static")
+
     def draw(self):
         app = self.app
         state = app.orb_state
@@ -242,7 +294,6 @@ class Orb(tk.Canvas):
         self.t += 0.033
         t = self.t
 
-        # target "loudness" for this state
         target = cfg["base"]
         if state == "speaking":
             target += 0.30 * abs(math.sin(t * 9.0) * math.sin(t * 3.3 + 1.0)) + 0.10 * random.random()
@@ -252,41 +303,56 @@ class Orb(tk.Canvas):
             target += 0.03 * math.sin(t * 2)
         self.level += (target - self.level) * 0.2
         level = max(0.0, self.level)
-
         self.rgb = mix(self.rgb, cfg["color"], 0.08)
         rgb = self.rgb
         self.angle += cfg["speed"]
 
-        w = self.winfo_width()
-        h = self.winfo_height()
+        w, h = self.winfo_width(), self.winfo_height()
         if w < 80 or h < 80:
             return
-        self.delete("all")
+        if self.size != (w, h):
+            self.draw_static()
+        self.delete("dyn")
+        T = "dyn"
+        col = lambda f: rgb_to_hex(mix(BG_RGB, rgb, f))
 
-        cx = w / 2
-        cy = h * 0.42
-        R = min(w * 0.30, h * 0.27) * (1 + level * 0.25)
-
-        # soft glow behind the orb
-        for k in range(6):
-            r = R * (2.0 - k * 0.2)
-            col = mix(BG_RGB, rgb, 0.015 + 0.012 * k + level * 0.05)
-            self.create_oval(cx - r, cy - r, cx + r, cy + r, fill=rgb_to_hex(col), outline="")
-
-        # rotating HUD arcs
-        ring_col = rgb_to_hex(mix(BG_RGB, rgb, 0.75))
-        ring_dim = rgb_to_hex(mix(BG_RGB, rgb, 0.30))
+        cx, cy = w / 2, h * 0.42
+        R = min(w * 0.26, h * 0.24) * (1 + level * 0.2)
         deg = math.degrees(self.angle)
-        for rad_mul, width, spd, extent, offset, col in (
-            (1.55, 3, 4.0, 70, 0, ring_col),
-            (1.55, 3, 4.0, 40, 180, ring_col),
-            (1.72, 2, -2.5, 110, 0, ring_dim),
-            (1.72, 2, -2.5, 50, 180, ring_dim),
-        ):
+
+        # glow
+        for k in range(6):
+            r = R * (2.1 - k * 0.2)
+            self.create_oval(cx - r, cy - r, cx + r, cy + r, outline="", tags=T,
+                             fill=col(0.015 + 0.012 * k + level * 0.05))
+
+        # radar sweep (fading wedge + bright leading line)
+        sweep = (-deg * 4) % 360
+        rs = R * 1.78
+        for k in range(14):
+            self.create_arc(cx - rs, cy - rs, cx + rs, cy + rs, start=(sweep + k * 2.5) % 360, extent=2.6,
+                            style="pieslice", fill=col(0.02 + 0.012 * (14 - k)), outline="", tags=T)
+        a = math.radians(sweep)
+        self.create_line(cx, cy, cx + math.cos(a) * rs, cy - math.sin(a) * rs, fill=col(0.7), width=2, tags=T)
+
+        # tick ring
+        r_tick = R * 1.42
+        for i in range(60):
+            a = math.radians(i * 6 + deg * 0.6)
+            ln = 12 if i % 5 == 0 else 6
+            self.create_line(cx + math.cos(a) * r_tick, cy + math.sin(a) * r_tick,
+                             cx + math.cos(a) * (r_tick + ln), cy + math.sin(a) * (r_tick + ln),
+                             fill=col(0.85 if i % 5 == 0 else 0.4), width=2 if i % 5 == 0 else 1, tags=T)
+
+        # segmented reactor arcs
+        for rad_mul, width, spd, segs, frac, f in ((1.28, 4, -1.4, 3, 0.62, 0.9),
+                                                    (1.78, 3, 0.9, 4, 0.5, 0.6),
+                                                    (2.02, 1, -0.5, 24, 0.5, 0.35)):
             r = R * rad_mul
-            start = (deg * spd + offset) % 360
-            self.create_arc(cx - r, cy - r, cx + r, cy + r, start=start, extent=extent,
-                            style="arc", outline=col, width=width)
+            step = 360 / segs
+            for i in range(segs):
+                self.create_arc(cx - r, cy - r, cx + r, cy + r, start=(deg * spd * 5 + i * step) % 360,
+                                extent=step * frac, style="arc", outline=col(f), width=width, tags=T)
 
         # ripples while speaking
         if state == "speaking" and t - self.last_ripple > 0.55:
@@ -299,60 +365,158 @@ class Orb(tk.Canvas):
                 continue
             alive.append(born)
             r = R * (1.15 + age * 0.75)
-            col = mix(BG_RGB, rgb, (1 - age / 1.6) * 0.7)
-            self.create_oval(cx - r, cy - r, cx + r, cy + r, outline=rgb_to_hex(col), width=2)
+            self.create_oval(cx - r, cy - r, cx + r, cy + r, outline=col((1 - age / 1.6) * 0.7), width=2, tags=T)
         self.ripples = alive
 
-        # the dot sphere
-        a = self.angle
-        ca, sa = math.cos(a), math.sin(a)
-        tilt = 0.4
-        ct, st = math.cos(tilt), math.sin(tilt)
+        # dot sphere
+        ca, sa = math.cos(self.angle), math.sin(self.angle)
+        ct, st = math.cos(0.4), math.sin(0.4)
         proj = []
         for i, (x, y, z) in enumerate(self.points):
-            if state == "speaking":
-                wob = 1 + level * 0.30 * math.sin(t * 6 + i * 0.9)
-            else:
-                wob = 1 + level * 0.12 * math.sin(t * 3 + i * 0.5)
+            wob = 1 + level * (0.30 if state == "speaking" else 0.12) * math.sin(t * (6 if state == "speaking" else 3) + i * 0.9)
             x1 = x * ca + z * sa
             z1 = -x * sa + z * ca
             y1 = y * ct - z1 * st
             z2 = y * st + z1 * ct
             p = 3.0 / (3.0 - z2)
-            sx = cx + x1 * R * wob * p
-            sy = cy + y1 * R * wob * p
-            proj.append((z2, sx, sy))
+            proj.append((z2, cx + x1 * R * wob * p, cy + y1 * R * wob * p))
         proj.sort()
         for z2, sx, sy in proj:
             depth = (z2 + 1) / 2
             size = 1.0 + 2.6 * depth + level * 1.6 * depth
-            col = mix(BG_RGB, rgb, 0.22 + 0.78 * depth)
+            c = mix(BG_RGB, rgb, 0.22 + 0.78 * depth)
             if depth > 0.8:
-                col = mix(col, (255, 255, 255), (depth - 0.8) * 1.2)
-            self.create_oval(sx - size, sy - size, sx + size, sy + size,
-                             fill=rgb_to_hex(col), outline="")
+                c = mix(c, (255, 255, 255), (depth - 0.8) * 1.2)
+            self.create_oval(sx - size, sy - size, sx + size, sy + size, fill=rgb_to_hex(c), outline="", tags=T)
+
+        # readouts around the reactor
+        dxl = min(R * 2.35, w / 2 - 90)
+        for x, y, text in ((cx, max(70, cy - R * 2.2), f"CPU {app.stat_cpu:.0f}%"),
+                           (cx + dxl, cy, f"RAM {app.stat_ram}%"),
+                           (cx - dxl, cy, "MIC " + ("LIVE" if app.running else "OFF"))):
+            self.create_text(x, y, text=text, fill=col(0.9), font=("Consolas", 10, "bold"), tags=T)
 
         # voice bars
-        wave_y = min(h - 110, cy + R * 1.95)
+        wave_y = min(h - 110, cy + R * 2.3)
         bars = 41
         gap = max(8, min(16, w / 70))
         for i in range(bars):
             d = i - bars // 2
-            envelope = 1 - abs(d) / (bars / 2 + 1)
-            wiggle = 0.5 + 0.5 * abs(math.sin(t * 7 + i * 0.6) + 0.5 * math.sin(t * 11 + i * 1.3))
-            hh = 3 + envelope * level * 230 * wiggle
-            x = cx + d * gap
-            col = mix(BG_RGB, rgb, 0.35 + 0.65 * envelope)
-            self.create_line(x, wave_y - hh, x, wave_y + hh, width=4, capstyle="round",
-                             fill=rgb_to_hex(col))
+            env = 1 - abs(d) / (bars / 2 + 1)
+            wig = 0.5 + 0.5 * abs(math.sin(t * 7 + i * 0.6) + 0.5 * math.sin(t * 11 + i * 1.3))
+            hh = 3 + env * level * 230 * wig
+            self.create_line(cx + d * gap, wave_y - hh, cx + d * gap, wave_y + hh, width=4, capstyle="round",
+                             fill=col(0.35 + 0.65 * env), tags=T)
 
         # captions
         if app.caption_user:
             self.create_text(cx, wave_y + 48, text="You: " + app.caption_user, fill=DIM,
-                             font=("Segoe UI", 11), width=w * 0.75, justify="center")
+                             font=("Segoe UI", 11), width=w * 0.7, justify="center", tags=T)
         if app.caption_jarvis:
             self.create_text(cx, wave_y + 90, text=app.caption_jarvis, fill=TEXT,
-                             font=("Segoe UI", 14), width=w * 0.75, justify="center")
+                             font=("Segoe UI", 14), width=w * 0.7, justify="center", tags=T)
+
+        # HUD corner text + scanline
+        hud = ("Consolas", 10, "bold")
+        self.create_text(44, 40, anchor="nw", text=f"SYS // {state.upper()}", fill=col(0.95), font=hud, tags=T)
+        self.create_text(44, 60, anchor="nw", text="VOICE LINK " + ("ACTIVE" if app.running else "STANDBY"),
+                         fill=col(0.5), font=("Consolas", 9), tags=T)
+        self.create_text(w - 44, 40, anchor="ne", text=datetime.datetime.now().strftime("%H:%M:%S"),
+                         fill=col(0.95), font=hud, tags=T)
+        self.create_text(w - 44, 60, anchor="ne", text=f"LOCAL AI // {MODEL}", fill=col(0.5),
+                         font=("Consolas", 9), tags=T)
+        self.create_text(44, h - 44, anchor="sw", text="J.A.R.V.I.S  MK VII", fill=col(0.6), font=hud, tags=T)
+        self.create_text(w - 44, h - 44, anchor="se", text="STARK INDUSTRIES", fill=col(0.6), font=hud, tags=T)
+        sy = (t * 90) % h
+        self.create_line(0, sy, w, sy, fill=col(0.10), width=2, tags=T)
+
+
+# ======================= PLUGINS =======================
+def http_get(url, timeout=12):
+    req = urllib.request.Request(url, headers={"User-Agent": "JarvisApp/1.0 (desktop assistant)"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8", "replace")
+
+
+def scroll_frame(parent, bg, wheel_owner):
+    """A vertically scrolling frame. Returns the inner frame to put things in."""
+    canvas = tk.Canvas(parent, bg=bg, highlightthickness=0)
+    bar = tk.Scrollbar(parent, orient="vertical", command=canvas.yview)
+    inner = tk.Frame(canvas, bg=bg)
+    win = canvas.create_window((0, 0), window=inner, anchor="nw")
+    inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+    canvas.bind("<Configure>", lambda e: canvas.itemconfig(win, width=e.width))
+    canvas.configure(yscrollcommand=bar.set)
+    canvas.pack(side="left", fill="both", expand=True)
+    bar.pack(side="right", fill="y")
+    wheel_owner.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-e.delta / 120), "units"))
+    return inner
+
+
+class PluginAPI:
+    """What a store module can use. It is passed to the module's setup(api) function.
+
+    api.theme                      dict of colors (bg, panel, panel2, border, accent, ok, warn, text, dim, red)
+    api.add_card(title)            new card in the Modules panel, returns a tk.Frame to fill
+    api.add_tool(name, desc, params, func)   let the AI call func(args_dict); params = {"x": ("string", "help")}
+    api.add_command(regex, func)   instant voice command; func(match) returns the reply text
+    api.speak(text) / api.log(text) / api.ui(fn) / api.after(ms, fn)
+    api.get(key, default) / api.set(key, value)   saved settings for this module
+    api.http_json(url) / api.http_get(url) / api.open_app(name) / api.root
+    """
+
+    def __init__(self, app, meta):
+        self.app, self.meta, self.root, self.alive = app, meta, app.root, True
+        self.theme = {"bg": BG, "panel": PANEL, "panel2": PANEL2, "border": BORDER, "accent": ACCENT,
+                      "ok": OK, "warn": WARN, "text": TEXT, "dim": DIM, "red": RED}
+        self.http_json = http_json
+        self.http_get = http_get
+
+    def open_app(self, name):
+        """Open an app by name (searches the Start menu). Returns a short reply."""
+        return self.app.open_app(name) or f"No app called {name} was found."
+
+    def add_card(self, title):
+        body = self.app.card_frame(str(title).upper())
+        self.app.plugin_cards.setdefault(self.meta["id"], []).append(body.master)
+        return body
+
+    def add_tool(self, name, description, params, func):
+        self.app.plugin_tools[name] = (func, _tool(name, description, **params), self.meta["id"])
+
+    def add_command(self, pattern, func):
+        self.app.plugin_cmds.append((re.compile(pattern, re.I), func, self.meta["id"]))
+
+    def after(self, ms, fn):
+        def run():
+            if self.alive:
+                try:
+                    fn()
+                except Exception:
+                    pass
+        self.root.after(ms, run)
+
+    def ui(self, fn):
+        self.app.ui(fn)
+
+    def speak(self, text):
+        def work():
+            self.app.com_init()
+            self.app.speak(text)
+        threading.Thread(target=work, daemon=True).start()
+
+    def log(self, text):
+        self.app.log("sys", text)
+
+    def _key(self, key):
+        return f"mod_{self.meta['id']}_{key}"
+
+    def get(self, key, default=None):
+        return self.app.settings.get(self._key(key), default)
+
+    def set(self, key, value):
+        self.app.settings[self._key(key)] = value
+        self.app.save_settings()
 
 
 # ======================= APP =======================
@@ -391,8 +555,15 @@ class JarvisApp:
         self.cmd_count = 0
         self.t_start = time.time()
         self.last_cpu = None
+        self.stat_cpu = 0.0
+        self.stat_ram = 0
+        self.plugin_tools = {}        # name -> (function, schema, owner)
+        self.plugin_cmds = []         # (regex, function, owner)
+        self.plugin_cards = {}        # owner -> [card frames]
+        self.plugins = {}             # id -> PluginAPI
 
         self.build_ui()
+        self.load_all_plugins()
         self.refresh_mics()
         self.poll_queue()
         self.tick_clock()
@@ -420,8 +591,10 @@ class JarvisApp:
         root.grid_columnconfigure(0, weight=0)
         root.grid_columnconfigure(1, weight=1)
         root.grid_columnconfigure(2, weight=0)
-        root.grid_rowconfigure(0, weight=1)
+        root.grid_rowconfigure(0, weight=0)
+        root.grid_rowconfigure(1, weight=1)
 
+        self.build_header(root)
         self.build_left(root)
         self.build_center(root)
         self.build_right(root)
@@ -429,7 +602,7 @@ class JarvisApp:
     # ----- left sidebar -----
     def build_left(self, root):
         left = tk.Frame(root, bg=PANEL, width=270)
-        left.grid(row=0, column=0, sticky="ns")
+        left.grid(row=1, column=0, sticky="ns")
         left.grid_propagate(False)
 
         self.logo_img = None
@@ -470,6 +643,19 @@ class JarvisApp:
                   activebackground=BORDER, activeforeground=TEXT,
                   command=self.refresh_mics).pack(side="left", padx=(6, 0), ipadx=6)
 
+        tk.Button(left, text="MODULE STORE", font=("Consolas", 10, "bold"), fg=ACCENT, bg=PANEL2,
+                  activebackground=ACCENT, activeforeground=BG, bd=0, cursor="hand2", pady=7,
+                  command=self.open_store).pack(fill="x", padx=22, pady=(16, 0))
+        tk.Label(left, text="THEME", font=("Segoe UI", 9, "bold"), fg=DIM, bg=PANEL,
+                 anchor="w").pack(fill="x", padx=22, pady=(14, 0))
+        self.theme_var = tk.StringVar(value=THEME_NAME)
+        theme_menu = tk.OptionMenu(left, self.theme_var, *THEMES.keys(), command=self.pick_theme)
+        theme_menu.config(bg=PANEL2, fg=TEXT, activebackground=BORDER, activeforeground=TEXT,
+                          highlightthickness=0, bd=0, relief="flat", anchor="w", font=("Segoe UI", 9))
+        theme_menu["menu"].config(bg=PANEL2, fg=TEXT, activebackground=ACCENT, activeforeground=BG,
+                                  font=("Segoe UI", 9))
+        theme_menu.pack(fill="x", padx=22, pady=(4, 0))
+
         self.speak_var = tk.BooleanVar(value=True)
         tk.Checkbutton(left, text="Speak replies out loud", variable=self.speak_var,
                        command=lambda: setattr(self, "speak_enabled", self.speak_var.get()),
@@ -487,7 +673,7 @@ class JarvisApp:
     # ----- center (orb / chat) -----
     def build_center(self, root):
         center = tk.Frame(root, bg=BG)
-        center.grid(row=0, column=1, sticky="nsew")
+        center.grid(row=1, column=1, sticky="nsew")
         center.grid_rowconfigure(1, weight=1)
         center.grid_columnconfigure(0, weight=1)
 
@@ -555,7 +741,7 @@ class JarvisApp:
 
     def build_right(self, root):
         right = tk.Frame(root, bg=PANEL, width=300)
-        right.grid(row=0, column=2, sticky="ns")
+        right.grid(row=1, column=2, sticky="ns")
         right.grid_propagate(False)
 
         tk.Label(right, text="MODULES", font=("Segoe UI", 9, "bold"), fg=DIM, bg=PANEL,
@@ -585,12 +771,15 @@ class JarvisApp:
         self.build_notes_module()
         _, self.last_heard_label = self.add_card("LAST HEARD", "-")
         self.build_session_module()
-        self.add_card("EMPTY SLOT", "Add a module here", dim=True)
+        body = self.card_frame("MODULE STORE")
+        tk.Label(body, text="Add cards, voice commands and AI tools.", font=("Segoe UI", 9), fg=DIM,
+                 bg=PANEL2, anchor="w", wraplength=230, justify="left").pack(fill="x")
+        self.small_button(body, "Open Store", self.open_store, anchor="w", pady=(6, 0))
 
     def card_frame(self, title):
         card = tk.Frame(self.modules, bg=PANEL2, highlightbackground=BORDER, highlightthickness=1)
         card.pack(fill="x", pady=6, padx=(0, 12))
-        tk.Label(card, text=title, font=("Segoe UI", 8, "bold"), fg=DIM, bg=PANEL2,
+        tk.Label(card, text="\u25b8 " + title, font=("Consolas", 9, "bold"), fg=ACCENT, bg=PANEL2,
                  anchor="w").pack(fill="x", padx=12, pady=(8, 0))
         body = tk.Frame(card, bg=PANEL2)
         body.pack(fill="x", padx=12, pady=(2, 10))
@@ -625,6 +814,7 @@ class JarvisApp:
         now = datetime.datetime.now()
         self.clock_label.config(text=now.strftime("%I:%M %p").lstrip("0"))
         self.date_label.config(text=now.strftime("%A, %B %d"))
+        self.hdr_clock.config(text=now.strftime("%H:%M:%S"))
         self.refresh_timers()
         up = int(time.time() - self.t_start)
         self.session_label.config(
@@ -708,9 +898,11 @@ class JarvisApp:
             if self.last_cpu:
                 di, dt = idle - self.last_cpu[0], total - self.last_cpu[1]
                 cpu = 100 * (1 - di / dt) if dt else 0
+                self.stat_cpu = cpu
                 self.set_bar("CPU", cpu, f"{cpu:.0f}%")
             self.last_cpu = (idle, total)
             ram = self.read_ram_percent()
+            self.stat_ram = ram
             self.set_bar("RAM", ram, f"{ram}%")
             du = shutil.disk_usage("C:\\")
             self.set_bar("DISK", du.used / du.total * 100, f"{du.used / du.total * 100:.0f}%")
@@ -841,6 +1033,167 @@ class JarvisApp:
                                       bg=PANEL2, anchor="w", justify="left")
         self.session_label.pack(fill="x")
 
+    # ---------- header ----------
+    def build_header(self, root):
+        bar = tk.Frame(root, bg=PANEL)
+        bar.grid(row=0, column=0, columnspan=3, sticky="ew")
+        tk.Frame(bar, bg=BORDER, height=2).pack(side="bottom", fill="x")
+        tk.Label(bar, text="J.A.R.V.I.S", font=("Consolas", 15, "bold"), fg=ACCENT,
+                 bg=PANEL).pack(side="left", padx=(20, 8), pady=8)
+        tk.Label(bar, text="//  STARK INDUSTRIES  \u00b7  MARK VII", font=("Consolas", 9), fg=DIM,
+                 bg=PANEL).pack(side="left")
+        self.hdr_clock = tk.Label(bar, text="", font=("Consolas", 11, "bold"), fg=TEXT, bg=PANEL)
+        self.hdr_clock.pack(side="right", padx=20)
+        self.hdr_status = tk.Label(bar, text="\u25cf OFFLINE", font=("Consolas", 10, "bold"), fg=DIM, bg=PANEL)
+        self.hdr_status.pack(side="right", padx=10)
+
+    def pick_theme(self, name):
+        self.settings["theme"] = name
+        self.save_settings()
+        messagebox.showinfo("Theme saved", "Restart Jarvis to apply the new theme.")
+
+    # ---------- plugins ----------
+    def load_plugin(self, path):
+        spec = importlib.util.spec_from_file_location("jmod_" + os.path.basename(path)[:-3], path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        meta = dict(getattr(mod, "META", {}))
+        pid = meta.get("id") or os.path.basename(path)[:-3]
+        meta["id"] = pid
+        if pid in self.plugins:
+            self.unload_plugin(pid)
+        api = PluginAPI(self, meta)
+        self.plugins[pid] = api
+        try:
+            mod.setup(api)
+        except Exception:
+            self.unload_plugin(pid)
+            raise
+
+    def unload_plugin(self, pid):
+        api = self.plugins.pop(pid, None)
+        if api:
+            api.alive = False
+        for frame in self.plugin_cards.pop(pid, []):
+            try:
+                frame.destroy()
+            except Exception:
+                pass
+        self.plugin_tools = {k: v for k, v in self.plugin_tools.items() if v[2] != pid}
+        self.plugin_cmds = [c for c in self.plugin_cmds if c[2] != pid]
+
+    def load_all_plugins(self):
+        try:
+            os.makedirs(MODULES_DIR, exist_ok=True)
+            files = sorted(f for f in os.listdir(MODULES_DIR) if f.endswith(".py"))
+        except Exception:
+            return
+        for f in files:
+            try:
+                self.load_plugin(os.path.join(MODULES_DIR, f))
+            except Exception as e:
+                self.log("sys", f"[Module error] {f}: {e}")
+
+    # ---------- module store ----------
+    def fetch_catalog(self):
+        entries = {}
+        try:
+            with open(os.path.join(SCRIPT_DIR, "store", "store.json"), "r", encoding="utf-8") as f:
+                for m in json.load(f)["modules"]:
+                    m["local"] = True
+                    entries[m["id"]] = m
+        except Exception:
+            pass
+        try:
+            for m in http_json(STORE_URL, timeout=6)["modules"]:
+                m["local"] = False
+                entries[m["id"]] = m
+        except Exception:
+            pass
+        return list(entries.values())
+
+    def open_store(self):
+        win = tk.Toplevel(self.root)
+        win.title("Jarvis Module Store")
+        win.geometry("700x680")
+        win.configure(bg=BG)
+        try:
+            win.iconbitmap(LOGO_ICO)
+        except Exception:
+            pass
+        tk.Label(win, text="MODULE STORE", font=("Consolas", 18, "bold"), fg=ACCENT,
+                 bg=BG).pack(anchor="w", padx=20, pady=(18, 0))
+        tk.Label(win, text="Modules add cards, voice commands and AI tools. Changes apply instantly.",
+                 font=("Segoe UI", 9), fg=DIM, bg=BG).pack(anchor="w", padx=20, pady=(0, 8))
+        holder = tk.Frame(win, bg=BG)
+        holder.pack(fill="both", expand=True)
+        inner = scroll_frame(holder, BG, win)
+        tk.Label(inner, text="Loading...", fg=DIM, bg=BG).pack(pady=20)
+
+        def work():
+            entries = self.fetch_catalog()
+            self.ui(lambda: self.render_store(inner, entries))
+        threading.Thread(target=work, daemon=True).start()
+
+    def render_store(self, inner, entries):
+        for w in inner.winfo_children():
+            w.destroy()
+        if not entries:
+            tk.Label(inner, text="No modules found.", fg=DIM, bg=BG).pack(pady=20)
+            return
+        for m in entries:
+            installed = m["id"] in self.plugins
+            row = tk.Frame(inner, bg=PANEL2, highlightbackground=BORDER, highlightthickness=1)
+            row.pack(fill="x", padx=16, pady=6)
+            info = tk.Frame(row, bg=PANEL2)
+            info.pack(side="left", fill="x", expand=True, padx=12, pady=10)
+            tk.Label(info, text=f"{m['name']}  v{m.get('version', '1.0')}", font=("Consolas", 11, "bold"),
+                     fg=ACCENT, bg=PANEL2, anchor="w").pack(fill="x")
+            tk.Label(info, text=m.get("description", ""), font=("Segoe UI", 9), fg=TEXT, bg=PANEL2,
+                     anchor="w", justify="left", wraplength=400).pack(fill="x")
+            tk.Label(info, text="by " + m.get("author", "?") + ("" if m.get("local") else "  (online)"),
+                     font=("Segoe UI", 8), fg=DIM, bg=PANEL2, anchor="w").pack(fill="x")
+            tk.Button(row, text="REMOVE" if installed else "INSTALL", width=9, bd=0, cursor="hand2",
+                      font=("Segoe UI", 9, "bold"), bg=PANEL if installed else ACCENT,
+                      fg=TEXT if installed else BG,
+                      command=lambda m=m: self.store_action(m, inner, entries)).pack(side="right", padx=12)
+
+    def store_action(self, m, inner, entries):
+        try:
+            if m["id"] in self.plugins:
+                self.remove_module(m)
+            else:
+                self.install_module(m)
+        except Exception as e:
+            messagebox.showerror("Module error", str(e))
+        self.render_store(inner, entries)
+
+    def install_module(self, m):
+        pid = re.sub(r"[^a-z0-9_]", "", str(m["id"]).lower())
+        os.makedirs(MODULES_DIR, exist_ok=True)
+        dest = os.path.join(MODULES_DIR, pid + ".py")
+        if m.get("local"):
+            shutil.copy(os.path.join(SCRIPT_DIR, "store", os.path.basename(m["file"])), dest)
+        else:
+            if not messagebox.askyesno("Install module",
+                                       f"{m['name']} will download and run code from the internet.\n\n"
+                                       "Only install modules you trust. Continue?"):
+                return
+            req = urllib.request.Request(m["url"], headers={"User-Agent": "JarvisApp/1.0"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                data = r.read(300000)
+            with open(dest, "wb") as f:
+                f.write(data)
+        self.load_plugin(dest)
+
+    def remove_module(self, m):
+        self.unload_plugin(m["id"])
+        pid = re.sub(r"[^a-z0-9_]", "", str(m["id"]).lower())
+        try:
+            os.remove(os.path.join(MODULES_DIR, pid + ".py"))
+        except OSError:
+            pass
+
     # ---------- microphones ----------
     def refresh_mics(self):
         mics = [("Default microphone", None)]
@@ -938,12 +1291,14 @@ class JarvisApp:
         # keep sidebar labels in sync
         if self.running:
             self.status.config(text="ONLINE", fg=ACCENT)
+            self.hdr_status.config(text="\u25cf ONLINE", fg=OK)
             self.mode_label.config(text="In conversation" if self.conversation
                                    else 'Waiting for "Jarvis"')
             if self.button["state"] == "normal":
                 self.button.config(text="STOP", bg=RED, activebackground=RED)
         else:
             self.status.config(text="Offline", fg=DIM)
+            self.hdr_status.config(text="\u25cf OFFLINE", fg=DIM)
             self.mode_label.config(text="")
             self.button.config(text="START", bg=ACCENT, activebackground=ACCENT)
         self.root.after(100, self.poll_queue)
@@ -1018,7 +1373,7 @@ class JarvisApp:
         for use_tools in (True, False):
             body = {"model": MODEL, "messages": messages, "stream": False}
             if use_tools:
-                body["tools"] = TOOLS
+                body["tools"] = TOOLS + [v[1] for v in self.plugin_tools.values()]
             req = urllib.request.Request(OLLAMA_URL, data=json.dumps(body).encode("utf-8"),
                                          headers={"Content-Type": "application/json"})
             try:
@@ -1069,6 +1424,8 @@ class JarvisApp:
     def run_tool(self, name, a):
         """Run one tool the AI asked for. The returned text goes back to the AI."""
         try:
+            if name in self.plugin_tools:
+                return str(self.plugin_tools[name][0](a))
             if name == "open_app":
                 return self.open_app(str(a.get("name", ""))) or f"No app called {a.get('name')} was found."
             if name == "close_app":
@@ -1231,6 +1588,14 @@ class JarvisApp:
         if CREATOR_RE.search(cmd):
             self.pending_url = CREATOR_URL
             return f"I was created by {CREATOR_NAME}. Would you like me to open his {CREATOR_LINK_NAME}?"
+
+        for rx, fn, _owner in list(self.plugin_cmds):      # commands from store modules
+            m = rx.search(cmd)
+            if m:
+                try:
+                    return str(fn(m))
+                except Exception:
+                    continue                                  # let the next command or the AI handle it
 
         if re.search(r"\bwhat('s| is) the time\b|\bwhat time is it\b", cmd):
             return datetime.datetime.now().strftime("It's %I:%M %p.").replace("It's 0", "It's ")
