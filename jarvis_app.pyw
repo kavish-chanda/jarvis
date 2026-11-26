@@ -72,7 +72,7 @@ APP_OVERRIDES = {
 QUICK_LAUNCH = ["Chrome", "Spotify", "Discord", "Steam", "Notepad", "Calculator"]
 
 CREATOR_NAME = "Kavish Chanda"
-CREATOR_URL = "https://github.com/kavish-chanda"   # <-- put your GitHub (or portfolio) link here
+CREATOR_URL = "https://github.com/kavish-chanda"   # opened when someone asks who made Jarvis
 CREATOR_LINK_NAME = "GitHub page"
 
 SYSTEM_PROMPT = (
@@ -1105,7 +1105,12 @@ class JarvisApp:
         except Exception:
             pass
         try:
+            base = STORE_URL.rsplit("/", 1)[0]
             for m in http_json(STORE_URL, timeout=6)["modules"]:
+                if m["id"] in entries and "url" not in m:
+                    continue                               # bundled copy wins; no re-download needed
+                if "url" not in m and m.get("file"):
+                    m["url"] = base + "/" + os.path.basename(m["file"])
                 m["local"] = False
                 entries[m["id"]] = m
         except Exception:

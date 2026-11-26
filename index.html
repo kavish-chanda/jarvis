@@ -451,6 +451,141 @@
       transform: translate(-50%, 0)
     }
 
+    .sbar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+      align-items: center
+    }
+
+    .sbar input {
+      flex: 1;
+      min-width: 200px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 11px 14px;
+      color: var(--txt);
+      font: 14px inherit;
+      font-family: inherit
+    }
+
+    .count {
+      color: var(--mint);
+      font-size: 14px
+    }
+
+    .sgrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 14px
+    }
+
+    .mod {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: .2s
+    }
+
+    .mod.on {
+      border-color: var(--mint);
+      box-shadow: 0 0 22px rgba(94, 255, 208, .15)
+    }
+
+    .mod h3 {
+      font-size: 15px
+    }
+
+    .mod p {
+      color: var(--dim);
+      font-size: 13px;
+      flex: 1
+    }
+
+    .mod small {
+      color: var(--acc);
+      font-size: 12px
+    }
+
+    .mod button {
+      margin-top: 6px;
+      border: 0;
+      border-radius: 8px;
+      padding: 8px;
+      font: 700 13px inherit;
+      font-family: inherit;
+      cursor: pointer;
+      background: var(--acc);
+      color: #04101a
+    }
+
+    .mod.on button {
+      background: var(--panel2);
+      color: var(--txt)
+    }
+
+    .themes {
+      display: flex;
+      gap: 7px
+    }
+
+    .themes button {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid var(--line);
+      cursor: pointer
+    }
+
+    .mini {
+      margin-top: 26px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px
+    }
+
+    .mini h4 {
+      font-size: 12px;
+      color: var(--dim);
+      letter-spacing: 2px;
+      margin-bottom: 10px
+    }
+
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-height: 34px
+    }
+
+    .pill {
+      background: var(--panel2);
+      border: 1px solid var(--acc);
+      border-radius: 99px;
+      padding: 5px 12px;
+      font-size: 12px;
+      animation: pop .3s
+    }
+
+    @keyframes pop {
+      from {
+        transform: scale(.6);
+        opacity: 0
+      }
+
+      to {
+        transform: none;
+        opacity: 1
+      }
+    }
+
     @media(max-width:800px) {
       .demo {
         grid-template-columns: 1fr
@@ -476,19 +611,20 @@
 <body>
   <nav>
     <div class="wrap"><b><img src="jarvis_logo.png" alt="">J.A.R.V.I.S</b>
-      <a class="h" href="#demo">Demo</a><a class="h" href="#features">Features</a><a class="h"
-        href="#install">Install</a>
-      <a class="btn pri" style="padding:8px 18px;font-size:13px" href="#install">Download</a>
+      <a class="h" href="#demo">Demo</a><a class="h" href="#features">Features</a><a class="h" href="#store">Store</a><a
+        class="h" href="#install">Install</a>
+      <div class="themes" id="themes" title="Theme"></div><a class="btn pri" style="padding:8px 18px;font-size:13px"
+        href="#install">Download</a>
     </div>
   </nav>
 
   <header class="hero wrap">
-    <span class="badge">v1.1 · for Windows</span>
+    <span class="badge">v1.1.2 · for Windows</span>
     <canvas id="heroOrb"></canvas>
     <h1>J.A.R.V.I.S</h1>
     <p>A voice assistant that lives on your PC. Say its name once, then just talk. It opens your apps, searches, plays
       music, and answers questions with a local AI.</p>
-    <div class="row"><button class="btn pri" onclick="download()">⬇ Download v1.1</button><a class="btn sec"
+    <div class="row"><button class="btn pri" onclick="download()">⬇ Download v1.1.2</button><a class="btn sec"
         href="#demo">Try the demo</a></div>
     <div class="hint">Move your mouse over the orb · click it to make it talk</div>
   </header>
@@ -545,8 +681,24 @@
         </div>
         <div class="card"><i>🧩</i>
           <h3>Modules</h3>
-          <p>A side panel with room to grow: clock, last heard, and slots for new widgets.</p>
+          <p>A scrolling side panel of live cards: system stats, weather, timers, notes and more. Add 20+ extra modules
+            from the store.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="store">
+    <div class="wrap reveal">
+      <h2>The Module Store</h2>
+      <p class="sub">Jarvis grows with you. Every module adds a card, voice commands and AI tools, and installs
+        instantly. Try it: install a few and watch your Jarvis build up.</p>
+      <div class="sbar"><input id="q" placeholder="Search modules…"><span class="count" id="cnt">0
+          installed</span><button class="chip" id="all">Install / remove all</button></div>
+      <div class="sgrid" id="sgrid"></div>
+      <div class="mini">
+        <h4>YOUR JARVIS</h4>
+        <div class="pills" id="pills"></div>
       </div>
     </div>
   </section>
@@ -585,7 +737,7 @@
         <div class="n">3</div>
         <div>
           <h3>Download Jarvis</h3>
-          <p>Version 1.0.0 for Windows, a single .exe file.</p>
+          <p>Version 1.1.2 for Windows, a single .exe file.</p>
           <button class="btn pri" style="padding:9px 18px;font-size:14px" onclick="download()">⬇ Download
             Jarvis.exe</button>
           <div class="note">Windows may show “Windows protected your PC” because the app isn’t code-signed. Click
@@ -606,13 +758,13 @@
   </section>
 
   <footer>
-    <div class="wrap">J.A.R.V.I.S v1.1 · Windows 10/11 · Made by Kavish</div>
+    <div class="wrap">J.A.R.V.I.S v1.1.2 · Windows 10/11 · Made by Kavish</div>
   </footer>
   <div id="toast"></div>
 
   <script>
     // ====== EDIT THIS: link to your release file (GitHub > Releases > upload Jarvis.exe) ======
-    const DOWNLOAD_URL = "https://github.com/kavish-chanda/jarvis/releases/download/v1.1/Jarvis.exe";
+    const DOWNLOAD_URL = "https://github.com/kavish-chanda/jarvis/releases/download/v1.1.2/Jarvis.exe";
     const GITHUB_URL = "https://github.com/kavish-chanda";   // opened by the "who created you" demo
     // ===========================================================================================
 
@@ -621,10 +773,11 @@
     function download() { toast("Download starting. If Windows warns you, choose More info → Run anyway."); setTimeout(() => { location.href = DOWNLOAD_URL }, 900) }
 
     /* ---------- orb ---------- */
+    const PAL = { idle: [0, 212, 255], listen: [94, 255, 208], think: [255, 179, 71], speak: [0, 229, 255], off: [59, 76, 107] };
     function makeOrb(cv, opts) {
       const ctx = cv.getContext("2d"), N = 240, G = Math.PI * (3 - Math.sqrt(5)), P = [];
       for (let i = 0; i < N; i++) { const y = 1 - i / (N - 1) * 2, r = Math.sqrt(1 - y * y); P.push([Math.cos(G * i) * r, y, Math.sin(G * i) * r]) }
-      const COL = { idle: [0, 212, 255], listen: [94, 255, 208], think: [255, 179, 71], speak: [0, 229, 255], off: [59, 76, 107] };
+      const COL = PAL;
       const o = { state: "idle", level: 0, ang: 0, t: 0, rgb: COL.idle.slice(), mx: 0, my: 0, ripples: [], lastR: 0, set(s) { o.state = s } };
       function fit() { const d = devicePixelRatio || 1, r = cv.getBoundingClientRect(); cv.width = r.width * d; cv.height = r.height * d; ctx.setTransform(d, 0, 0, d, 0, 0) }
       addEventListener("resize", fit); fit();
@@ -759,6 +912,64 @@
       }
     });
     upd();
+
+    /* ---------- module store ---------- */
+    const MODS = [
+      ["⏱️", "Focus Timer", "Pomodoro timer with voice control.", "Jarvis, start a 25 minute focus session"],
+      ["₿", "Crypto Prices", "Live Bitcoin, Ethereum and Solana prices.", "What is the price of bitcoin?"],
+      ["📰", "News Headlines", "Top world headlines on a card.", "What is the news?"],
+      ["✅", "To-Do List", "A saved task list you fill by voice.", "Add buy cables to my to-do list"],
+      ["💱", "Currency Converter", "Live exchange rates.", "Convert 100 USD to EUR"],
+      ["📸", "Screenshot", "Capture your screen by voice or button.", "Take a screenshot"],
+      ["📋", "Clipboard History", "Your last 5 copied texts.", "Read my clipboard"],
+      ["🎲", "Fun Pack", "Fun facts, coin flips and dice.", "Flip a coin"],
+      ["📖", "Dictionary", "Word definitions.", "Define serendipity"],
+      ["💬", "Daily Quotes", "Inspirational quotes.", "Inspire me"],
+      ["🛰️", "ISS Tracker", "Where the space station is right now.", "Where is the space station?"],
+      ["🔋", "Power & Network", "Battery, IP address and live ping.", "How is my battery?"],
+      ["🧠", "Trivia", "A quiz game. Jarvis reveals the answer.", "Quiz me"],
+      ["🎬", "Scenes", "Open a whole group of apps at once.", "Start gaming mode"],
+      ["📅", "Countdowns", "Days until your events.", "How many days until winter break?"],
+      ["💧", "Health Reminders", "Spoken water, stretch and eye-rest reminders.", "(toggle them on the card)"],
+      ["🔐", "Password Maker", "Strong passwords, copied and never read aloud.", "Generate a password"],
+      ["🌍", "Translator", "Translate into a dozen languages.", "How do you say good morning in Spanish?"],
+      ["📏", "Unit Converter", "Length, weight, volume, speed, temperature.", "Convert 5 miles to kilometers"],
+      ["⛅", "3-Day Forecast", "Forecast with sunrise, sunset and moon phase.", "What's the forecast?"],
+      ["🐙", "GitHub Stats", "Repos, followers and stars.", "Show my GitHub stats"],
+      ["🗂️", "File Finder", "Find and open your files by name.", "Find file homework"]];
+    let inst = new Set(); try { inst = new Set(JSON.parse(localStorage.getItem("jarvisMods") || "[]")) } catch (e) { }
+    function saveMods() { try { localStorage.setItem("jarvisMods", JSON.stringify([...inst])) } catch (e) { } }
+    function renderStore() {
+      const q = $("#q").value.toLowerCase(), g = $("#sgrid"); g.innerHTML = "";
+      MODS.forEach((m, i) => {
+        if (q && !(m[1] + " " + m[2] + " " + m[3]).toLowerCase().includes(q)) return;
+        const on = inst.has(i), d = document.createElement("div"); d.className = "mod" + (on ? " on" : "");
+        d.innerHTML = '<i style="font-style:normal;font-size:24px">' + m[0] + '</i><h3>' + m[1] + '</h3><p>' + m[2] + '</p><small>“' + m[3] + '”</small>';
+        const b = document.createElement("button"); b.textContent = on ? "Installed ✓ (click to remove)" : "Install";
+        b.onclick = () => { if (on) inst.delete(i); else { inst.add(i); toast(m[1] + " installed. Try saying: “" + m[3] + "”"); say(m[1] + " installed.") } saveMods(); renderStore() };
+        d.appendChild(b); g.appendChild(d)
+      });
+      $("#cnt").textContent = inst.size + " of " + MODS.length + " installed";
+      const p = $("#pills"); p.innerHTML = "";
+      if (!inst.size) p.innerHTML = '<span style="color:var(--dim);font-size:13px">No modules yet. Install one above.</span>';
+      [...inst].forEach(i => { const s = document.createElement("span"); s.className = "pill"; s.textContent = MODS[i][0] + " " + MODS[i][1]; p.appendChild(s) });
+    }
+    $("#q").oninput = renderStore;
+    $("#all").onclick = () => { if (inst.size === MODS.length) inst.clear(); else MODS.forEach((_, i) => inst.add(i)); saveMods(); renderStore() };
+    renderStore();
+
+    /* ---------- themes ---------- */
+    const ST = {
+      cyan: { dot: "#00d4ff", v: { "--bg": "#070b14", "--panel": "#0d1424", "--panel2": "#131d33", "--line": "#1c2a48", "--acc": "#00d4ff", "--mint": "#5effd0", "--txt": "#d6e4ff", "--dim": "#7a8aa8" }, pal: [[0, 212, 255], [94, 255, 208], [255, 179, 71], [0, 229, 255], [59, 76, 107]] },
+      red: { dot: "#ffb000", v: { "--bg": "#0b0405", "--panel": "#150909", "--panel2": "#1e0e0f", "--line": "#6e1c1c", "--acc": "#ffb000", "--mint": "#ffd54a", "--txt": "#ffe9c9", "--dim": "#a07a60" }, pal: [[255, 176, 0], [255, 213, 74], [255, 122, 48], [255, 176, 0], [110, 60, 50]] },
+      green: { dot: "#00ff6a", v: { "--bg": "#020a04", "--panel": "#05120a", "--panel2": "#081a0f", "--line": "#0e5a2a", "--acc": "#00ff6a", "--mint": "#a6ff00", "--txt": "#d2ffe2", "--dim": "#5f9a75" }, pal: [[0, 255, 106], [166, 255, 0], [255, 225, 74], [0, 255, 106], [40, 90, 60]] }
+    };
+    function setTheme(k) {
+      const t = ST[k]; Object.entries(t.v).forEach(([a, b]) => document.documentElement.style.setProperty(a, b));
+      ["idle", "listen", "think", "speak", "off"].forEach((n, i) => PAL[n].splice(0, 3, ...t.pal[i])); try { localStorage.setItem("jarvisTheme", k) } catch (e) { }
+    }
+    Object.keys(ST).forEach(k => { const b = document.createElement("button"); b.style.background = ST[k].dot; b.title = k + " theme"; b.onclick = () => setTheme(k); $("#themes").appendChild(b) });
+    try { const sv = localStorage.getItem("jarvisTheme"); if (sv && ST[sv]) setTheme(sv) } catch (e) { }
   </script>
 </body>
 
