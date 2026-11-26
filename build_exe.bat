@@ -1,6 +1,4 @@
 @echo off
-rem Builds Jarvis.exe from jarvis_app.pyw
-rem Keep this file in the same folder as jarvis_app.pyw, jarvis_logo.png, jarvis_logo.ico and the store folder
 cd /d "%~dp0"
 
 echo Installing PyInstaller...

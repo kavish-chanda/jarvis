@@ -1,21 +1,3 @@
-"""
-J.A.R.V.I.S - desktop app
-
-Files that go in the same folder:
-    jarvis_app.pyw   (this file)
-    jarvis_logo.png  (logo shown in the app)
-    jarvis_logo.ico  (window icon; also use it for your desktop shortcut)
-
-Needs: SpeechRecognition, pyaudio, pyttsx3 (already installed for Python 3.12)
-       Ollama running with the model pulled:  ollama pull llama3.1:8b
-
-How to talk to it:
-    "Jarvis ..."        starts a conversation (say it once)
-    keep talking        no need to say Jarvis again
-    "thank you"         ends the conversation (back to waiting for "Jarvis")
-    "Jarvis stop"       turns listening off completely
-"""
-
 import os
 import re
 import sys
@@ -33,8 +15,8 @@ import ast
 import ctypes
 import shutil
 import importlib.util
-import xml.etree.ElementTree  # bundled so store modules can parse RSS feeds
-import html, secrets, socket, string  # bundled for store modules
+import xml.etree.ElementTree
+import html, secrets, socket, string
 import operator
 import urllib.error
 import urllib.parse
@@ -45,21 +27,17 @@ from tkinter import scrolledtext, messagebox
 import speech_recognition as sr
 import pyttsx3
 
-# Sharper text on high-DPI screens (Windows)
 try:
     import ctypes
     ctypes.windll.shcore.SetProcessDpiAwareness(1)
 except Exception:
     pass
 
-# ======================= CONFIG =======================
 WAKE_WORD = "jarvis"
-MODEL = "llama3.1:8b"                   # smarter brain. Faster/lighter option: "llama3.2"
+MODEL = "llama3.1:8b"
 OLLAMA_URL = "http://localhost:11434/api/chat"
-CONVERSATION_TIMEOUT = 60                # seconds of silence before a conversation ends on its own
+CONVERSATION_TIMEOUT = 60
 
-# Optional shortcuts that always win over the automatic app search.
-# spoken name -> command to run
 APP_OVERRIDES = {
     "file explorer": "explorer",
     "task manager": "taskmgr",
@@ -68,11 +46,10 @@ APP_OVERRIDES = {
     "calculator": "calc",
 }
 
-# Buttons in the Quick Launch module (names are searched in your Start menu)
 QUICK_LAUNCH = ["Chrome", "Spotify", "Discord", "Steam", "Notepad", "Calculator"]
 
 CREATOR_NAME = "Kavish Chanda"
-CREATOR_URL = "https://github.com/kavish-chanda"   # opened when someone asks who made Jarvis
+CREATOR_URL = "https://github.com/kavish-chanda"
 CREATOR_LINK_NAME = "GitHub page"
 
 SYSTEM_PROMPT = (
@@ -92,17 +69,14 @@ NO_RE = re.compile(r"\b(no|nope|nah|don'?t)\b")
 PROTECTED = {"explorer", "winlogon", "csrss", "wininit", "services", "lsass",
              "svchost", "system", "dwm", "smss"}
 
-# When packaged as an exe, bundled files live in sys._MEIPASS
 SCRIPT_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 SETTINGS_DIR = os.path.join(os.environ.get("APPDATA", SCRIPT_DIR), "Jarvis")
 SETTINGS_PATH = os.path.join(SETTINGS_DIR, "jarvis_settings.json")
-MODULES_DIR = os.path.join(SETTINGS_DIR, "modules")      # installed store modules live here
-# Optional online catalog (your GitHub). The bundled "store" folder always works offline.
+MODULES_DIR = os.path.join(SETTINGS_DIR, "modules")
 STORE_URL = "https://raw.githubusercontent.com/kavish-chanda/jarvis/main/store/store.json"
 LOGO_PNG = os.path.join(SCRIPT_DIR, "jarvis_logo.png")
 LOGO_ICO = os.path.join(SCRIPT_DIR, "jarvis_logo.ico")
 
-# Colors / themes (pick one in the app; applies after a restart)
 THEMES = {
     "Stark Cyan": dict(BG="#040810", PANEL="#08111e", PANEL2="#0c1a2b", BORDER="#0f4a6b", ACCENT="#00e1ff",
                        OK="#5effd0", WARN="#ffb347", TEXT="#d6f4ff", DIM="#6f8fa8", RED="#ff4d5e"),
@@ -127,7 +101,6 @@ if THEME_NAME not in THEMES:
 _T = THEMES[THEME_NAME]
 BG, PANEL, PANEL2, BORDER, ACCENT, OK, WARN, TEXT, DIM, RED = (
     _T[k] for k in ("BG", "PANEL", "PANEL2", "BORDER", "ACCENT", "OK", "WARN", "TEXT", "DIM", "RED"))
-# ======================================================
 
 
 def hex_to_rgb(h):
@@ -147,7 +120,6 @@ def mix(c1, c2, t):
 BG_RGB = hex_to_rgb(BG)
 ACCENT_RGB = hex_to_rgb(ACCENT)
 
-# How the orb looks in each state
 STATE_CFG = {
     "offline":      {"speed": 0.003, "base": 0.00, "color": hex_to_rgb(DIM)},
     "idle":         {"speed": 0.007, "base": 0.05, "color": hex_to_rgb(ACCENT)},
@@ -157,7 +129,6 @@ STATE_CFG = {
 }
 
 
-# ======================= TOOLS (what the AI can do) =======================
 def _tool(tool_name, tool_desc, /, **props):
     return {"type": "function", "function": {
         "name": tool_name, "description": tool_desc,
@@ -226,9 +197,7 @@ def press_key(vk, times=1):
         ctypes.windll.user32.keybd_event(vk, 0, 2, 0)
 
 
-# ======================= ORB (Stark HUD) =======================
 class Orb(tk.Canvas):
-    """Reactor rings, radar sweep, dot sphere, voice bars. Reacts to Jarvis's state."""
 
     def __init__(self, master, app):
         super().__init__(master, bg=BG, highlightthickness=0)
@@ -258,7 +227,6 @@ class Orb(tk.Canvas):
         self.after(33, self.tick)
 
     def draw_static(self):
-        """Hex grid, corner brackets and edge rulers. Drawn once per window size."""
         self.delete("static")
         w, h = self.winfo_width(), self.winfo_height()
         self.size = (w, h)
@@ -320,13 +288,11 @@ class Orb(tk.Canvas):
         R = min(w * 0.26, h * 0.24) * (1 + level * 0.2)
         deg = math.degrees(self.angle)
 
-        # glow
         for k in range(6):
             r = R * (2.1 - k * 0.2)
             self.create_oval(cx - r, cy - r, cx + r, cy + r, outline="", tags=T,
                              fill=col(0.015 + 0.012 * k + level * 0.05))
 
-        # radar sweep (fading wedge + bright leading line)
         sweep = (-deg * 4) % 360
         rs = R * 1.78
         for k in range(14):
@@ -335,7 +301,6 @@ class Orb(tk.Canvas):
         a = math.radians(sweep)
         self.create_line(cx, cy, cx + math.cos(a) * rs, cy - math.sin(a) * rs, fill=col(0.7), width=2, tags=T)
 
-        # tick ring
         r_tick = R * 1.42
         for i in range(60):
             a = math.radians(i * 6 + deg * 0.6)
@@ -344,7 +309,6 @@ class Orb(tk.Canvas):
                              cx + math.cos(a) * (r_tick + ln), cy + math.sin(a) * (r_tick + ln),
                              fill=col(0.85 if i % 5 == 0 else 0.4), width=2 if i % 5 == 0 else 1, tags=T)
 
-        # segmented reactor arcs
         for rad_mul, width, spd, segs, frac, f in ((1.28, 4, -1.4, 3, 0.62, 0.9),
                                                     (1.78, 3, 0.9, 4, 0.5, 0.6),
                                                     (2.02, 1, -0.5, 24, 0.5, 0.35)):
@@ -354,7 +318,6 @@ class Orb(tk.Canvas):
                 self.create_arc(cx - r, cy - r, cx + r, cy + r, start=(deg * spd * 5 + i * step) % 360,
                                 extent=step * frac, style="arc", outline=col(f), width=width, tags=T)
 
-        # ripples while speaking
         if state == "speaking" and t - self.last_ripple > 0.55:
             self.ripples.append(t)
             self.last_ripple = t
@@ -368,7 +331,6 @@ class Orb(tk.Canvas):
             self.create_oval(cx - r, cy - r, cx + r, cy + r, outline=col((1 - age / 1.6) * 0.7), width=2, tags=T)
         self.ripples = alive
 
-        # dot sphere
         ca, sa = math.cos(self.angle), math.sin(self.angle)
         ct, st = math.cos(0.4), math.sin(0.4)
         proj = []
@@ -389,14 +351,12 @@ class Orb(tk.Canvas):
                 c = mix(c, (255, 255, 255), (depth - 0.8) * 1.2)
             self.create_oval(sx - size, sy - size, sx + size, sy + size, fill=rgb_to_hex(c), outline="", tags=T)
 
-        # readouts around the reactor
         dxl = min(R * 2.35, w / 2 - 90)
         for x, y, text in ((cx, max(70, cy - R * 2.2), f"CPU {app.stat_cpu:.0f}%"),
                            (cx + dxl, cy, f"RAM {app.stat_ram}%"),
                            (cx - dxl, cy, "MIC " + ("LIVE" if app.running else "OFF"))):
             self.create_text(x, y, text=text, fill=col(0.9), font=("Consolas", 10, "bold"), tags=T)
 
-        # voice bars
         wave_y = min(h - 110, cy + R * 2.3)
         bars = 41
         gap = max(8, min(16, w / 70))
@@ -408,7 +368,6 @@ class Orb(tk.Canvas):
             self.create_line(cx + d * gap, wave_y - hh, cx + d * gap, wave_y + hh, width=4, capstyle="round",
                              fill=col(0.35 + 0.65 * env), tags=T)
 
-        # captions
         if app.caption_user:
             self.create_text(cx, wave_y + 48, text="You: " + app.caption_user, fill=DIM,
                              font=("Segoe UI", 11), width=w * 0.7, justify="center", tags=T)
@@ -416,7 +375,6 @@ class Orb(tk.Canvas):
             self.create_text(cx, wave_y + 90, text=app.caption_jarvis, fill=TEXT,
                              font=("Segoe UI", 14), width=w * 0.7, justify="center", tags=T)
 
-        # HUD corner text + scanline
         hud = ("Consolas", 10, "bold")
         self.create_text(44, 40, anchor="nw", text=f"SYS // {state.upper()}", fill=col(0.95), font=hud, tags=T)
         self.create_text(44, 60, anchor="nw", text="VOICE LINK " + ("ACTIVE" if app.running else "STANDBY"),
@@ -431,7 +389,6 @@ class Orb(tk.Canvas):
         self.create_line(0, sy, w, sy, fill=col(0.10), width=2, tags=T)
 
 
-# ======================= PLUGINS =======================
 def http_get(url, timeout=12):
     req = urllib.request.Request(url, headers={"User-Agent": "JarvisApp/1.0 (desktop assistant)"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -439,7 +396,6 @@ def http_get(url, timeout=12):
 
 
 def scroll_frame(parent, bg, wheel_owner):
-    """A vertically scrolling frame. Returns the inner frame to put things in."""
     canvas = tk.Canvas(parent, bg=bg, highlightthickness=0)
     bar = tk.Scrollbar(parent, orient="vertical", command=canvas.yview)
     inner = tk.Frame(canvas, bg=bg)
@@ -454,16 +410,6 @@ def scroll_frame(parent, bg, wheel_owner):
 
 
 class PluginAPI:
-    """What a store module can use. It is passed to the module's setup(api) function.
-
-    api.theme                      dict of colors (bg, panel, panel2, border, accent, ok, warn, text, dim, red)
-    api.add_card(title)            new card in the Modules panel, returns a tk.Frame to fill
-    api.add_tool(name, desc, params, func)   let the AI call func(args_dict); params = {"x": ("string", "help")}
-    api.add_command(regex, func)   instant voice command; func(match) returns the reply text
-    api.speak(text) / api.log(text) / api.ui(fn) / api.after(ms, fn)
-    api.get(key, default) / api.set(key, value)   saved settings for this module
-    api.http_json(url) / api.http_get(url) / api.open_app(name) / api.root
-    """
 
     def __init__(self, app, meta):
         self.app, self.meta, self.root, self.alive = app, meta, app.root, True
@@ -473,7 +419,6 @@ class PluginAPI:
         self.http_get = http_get
 
     def open_app(self, name):
-        """Open an app by name (searches the Start menu). Returns a short reply."""
         return self.app.open_app(name) or f"No app called {name} was found."
 
     def add_card(self, title):
@@ -519,7 +464,6 @@ class PluginAPI:
         self.app.save_settings()
 
 
-# ======================= APP =======================
 class JarvisApp:
     def __init__(self, root):
         self.root = root
@@ -533,7 +477,6 @@ class JarvisApp:
         except Exception:
             pass
 
-        # state shared with the worker thread
         self.q = queue.Queue()
         self.stop_event = threading.Event()
         self.thread = None
@@ -546,21 +489,21 @@ class JarvisApp:
         self.speak_enabled = True
         self.recognizer = sr.Recognizer()
         self.history = [{"role": "system", "content": SYSTEM_PROMPT}]
-        self.start_apps = {}          # lowercase name -> (display name, app id)
+        self.start_apps = {}
         self.settings = self.load_settings()
         self.mic_index = None
         self.mic_map = {}
-        self.pending_url = None       # link Jarvis offered to open
-        self.timers = []              # (end time, label)
+        self.pending_url = None
+        self.timers = []
         self.cmd_count = 0
         self.t_start = time.time()
         self.last_cpu = None
         self.stat_cpu = 0.0
         self.stat_ram = 0
-        self.plugin_tools = {}        # name -> (function, schema, owner)
-        self.plugin_cmds = []         # (regex, function, owner)
-        self.plugin_cards = {}        # owner -> [card frames]
-        self.plugins = {}             # id -> PluginAPI
+        self.plugin_tools = {}
+        self.plugin_cmds = []
+        self.plugin_cards = {}
+        self.plugins = {}
 
         self.build_ui()
         self.load_all_plugins()
@@ -569,7 +512,6 @@ class JarvisApp:
         self.tick_clock()
         threading.Thread(target=self.load_start_apps, daemon=True).start()
 
-    # ---------- settings ----------
     def load_settings(self):
         try:
             with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
@@ -585,7 +527,6 @@ class JarvisApp:
         except Exception:
             pass
 
-    # ---------- UI ----------
     def build_ui(self):
         root = self.root
         root.grid_columnconfigure(0, weight=0)
@@ -599,7 +540,6 @@ class JarvisApp:
         self.build_center(root)
         self.build_right(root)
 
-    # ----- left sidebar -----
     def build_left(self, root):
         left = tk.Frame(root, bg=PANEL, width=270)
         left.grid(row=1, column=0, sticky="ns")
@@ -670,7 +610,6 @@ class JarvisApp:
         tk.Label(left, text=hint, font=("Segoe UI", 9), fg=DIM, bg=PANEL,
                  justify="left", anchor="w").pack(side="bottom", fill="x", padx=22, pady=20)
 
-    # ----- center (orb / chat) -----
     def build_center(self, root):
         center = tk.Frame(root, bg=BG)
         center.grid(row=1, column=1, sticky="nsew")
@@ -691,11 +630,9 @@ class JarvisApp:
         body.grid_rowconfigure(0, weight=1)
         body.grid_columnconfigure(0, weight=1)
 
-        # orb view
         self.orb = Orb(body, self)
         self.orb.grid(row=0, column=0, sticky="nsew")
 
-        # chat view
         self.chat_frame = tk.Frame(body, bg=BG)
         self.chat_frame.grid(row=0, column=0, sticky="nsew")
         self.chat_frame.grid_rowconfigure(0, weight=1)
@@ -724,7 +661,7 @@ class JarvisApp:
 
     def show_view(self, which):
         if which == "orb":
-            tk.Misc.tkraise(self.orb)  # Canvas overrides tkraise (it raises canvas items), so call Misc's
+            tk.Misc.tkraise(self.orb)
         else:
             self.chat_frame.tkraise()
             self.entry.focus_set()
@@ -734,9 +671,7 @@ class JarvisApp:
             else:
                 btn.config(bg=PANEL2, fg=TEXT, activebackground=BORDER)
 
-    # ----- right panel (modules) -----
     def ui(self, fn):
-        """Run fn on the UI thread (safe to call from any thread)."""
         self.q.put(("call", fn))
 
     def build_right(self, root):
@@ -747,7 +682,6 @@ class JarvisApp:
         tk.Label(right, text="MODULES", font=("Segoe UI", 9, "bold"), fg=DIM, bg=PANEL,
                  anchor="w").pack(fill="x", padx=18, pady=(22, 6))
 
-        # scrollable area so we can keep adding modules
         canvas = tk.Canvas(right, bg=PANEL, highlightthickness=0)
         canvas.pack(fill="both", expand=True, padx=(12, 0))
         self.modules = tk.Frame(canvas, bg=PANEL)
@@ -760,7 +694,6 @@ class JarvisApp:
                 canvas.yview_scroll(int(-e.delta / 120), "units")
         root.bind_all("<MouseWheel>", wheel)
 
-        # ---- ADD NEW MODULES HERE (each one is a build_xxx_module method) ----
         self.build_clock_module()
         self.build_brain_module()
         self.build_system_module()
@@ -800,7 +733,6 @@ class JarvisApp:
         b.pack(**pack)
         return b
 
-    # --- clock ---
     def build_clock_module(self):
         body = self.card_frame("CLOCK")
         self.clock_label = tk.Label(body, text="", font=("Segoe UI", 24, "bold"),
@@ -821,7 +753,6 @@ class JarvisApp:
             text=f"Commands: {self.cmd_count}\nOpen for {up // 3600}h {up % 3600 // 60}m")
         self.root.after(1000, self.tick_clock)
 
-    # --- brain status ---
     def build_brain_module(self):
         body = self.card_frame("BRAIN")
         self.brain_label = tk.Label(body, text="Checking...", font=("Segoe UI", 11, "bold"),
@@ -844,7 +775,6 @@ class JarvisApp:
         threading.Thread(target=work, daemon=True).start()
         self.root.after(15000, self.check_brain)
 
-    # --- system stats ---
     def build_system_module(self):
         body = self.card_frame("SYSTEM")
         self.bars = {}
@@ -877,7 +807,7 @@ class JarvisApp:
         ctypes.windll.kernel32.GetSystemTimes(ctypes.byref(idle), ctypes.byref(kern),
                                               ctypes.byref(user))
         val = lambda t: (t.hi << 32) | t.lo
-        return val(idle), val(kern) + val(user)      # kernel time already includes idle
+        return val(idle), val(kern) + val(user)
 
     @staticmethod
     def read_ram_percent():
@@ -910,7 +840,6 @@ class JarvisApp:
             pass
         self.root.after(2000, self.tick_stats)
 
-    # --- weather ---
     def build_weather_module(self):
         body = self.card_frame("WEATHER")
         self.weather_big = tk.Label(body, text="--", font=("Segoe UI", 24, "bold"),
@@ -937,7 +866,6 @@ class JarvisApp:
         threading.Thread(target=work, daemon=True).start()
         self.root.after(900000, self.refresh_weather)
 
-    # --- timers ---
     def build_timers_module(self):
         body = self.card_frame("TIMERS")
         self.timer_label = tk.Label(body, text="No timers running", font=("Segoe UI", 10),
@@ -971,7 +899,6 @@ class JarvisApp:
             text = "No timers running"
         self.timer_label.config(text=text)
 
-    # --- quick launch ---
     def build_quick_launch_module(self):
         body = self.card_frame("QUICK LAUNCH")
         grid = tk.Frame(body, bg=PANEL2)
@@ -989,7 +916,6 @@ class JarvisApp:
             self.log("sys", self.open_app(name) or f"Couldn't find {name}.")
         threading.Thread(target=work, daemon=True).start()
 
-    # --- media / volume ---
     def build_media_module(self):
         body = self.card_frame("MEDIA")
         for keys in ((("\u23ee", 0xB1), ("\u23ef", 0xB3), ("\u23ed", 0xB0)),
@@ -1002,7 +928,6 @@ class JarvisApp:
                               activeforeground=BG, cursor="hand2", font=("Segoe UI", 11), pady=3)
                 b.pack(side="left", fill="x", expand=True, padx=2)
 
-    # --- notes ---
     def build_notes_module(self):
         body = self.card_frame("NOTES")
         self.notes = tk.Text(body, height=5, bg=PANEL, fg=TEXT, insertbackground=TEXT, bd=0,
@@ -1026,14 +951,12 @@ class JarvisApp:
         self.notes.see("end")
         self.save_notes()
 
-    # --- session ---
     def build_session_module(self):
         body = self.card_frame("SESSION")
         self.session_label = tk.Label(body, text="", font=("Segoe UI", 10), fg=TEXT,
                                       bg=PANEL2, anchor="w", justify="left")
         self.session_label.pack(fill="x")
 
-    # ---------- header ----------
     def build_header(self, root):
         bar = tk.Frame(root, bg=PANEL)
         bar.grid(row=0, column=0, columnspan=3, sticky="ew")
@@ -1052,7 +975,6 @@ class JarvisApp:
         self.save_settings()
         messagebox.showinfo("Theme saved", "Restart Jarvis to apply the new theme.")
 
-    # ---------- plugins ----------
     def load_plugin(self, path):
         spec = importlib.util.spec_from_file_location("jmod_" + os.path.basename(path)[:-3], path)
         mod = importlib.util.module_from_spec(spec)
@@ -1094,7 +1016,6 @@ class JarvisApp:
             except Exception as e:
                 self.log("sys", f"[Module error] {f}: {e}")
 
-    # ---------- module store ----------
     def fetch_catalog(self):
         entries = {}
         try:
@@ -1108,7 +1029,7 @@ class JarvisApp:
             base = STORE_URL.rsplit("/", 1)[0]
             for m in http_json(STORE_URL, timeout=6)["modules"]:
                 if m["id"] in entries and "url" not in m:
-                    continue                               # bundled copy wins; no re-download needed
+                    continue
                 if "url" not in m and m.get("file"):
                     m["url"] = base + "/" + os.path.basename(m["file"])
                 m["local"] = False
@@ -1199,7 +1120,6 @@ class JarvisApp:
         except OSError:
             pass
 
-    # ---------- microphones ----------
     def refresh_mics(self):
         mics = [("Default microphone", None)]
         try:
@@ -1223,7 +1143,6 @@ class JarvisApp:
             except Exception:
                 pass
 
-        # make labels unique
         self.mic_map = {}
         for name, idx in mics:
             label = name if name not in self.mic_map else f"{name} ({idx})"
@@ -1245,7 +1164,6 @@ class JarvisApp:
             self.save_settings()
             self.log("sys", f"Microphone set to: {label}")
 
-    # ---------- start / stop ----------
     def toggle(self):
         if self.thread and self.thread.is_alive():
             self.stop_event.set()
@@ -1267,7 +1185,6 @@ class JarvisApp:
             return "conversation"
         return "idle" if self.running else "offline"
 
-    # ---------- queue (worker -> UI) ----------
     def log(self, kind, text):
         self.q.put(("log", kind, text))
 
@@ -1293,7 +1210,6 @@ class JarvisApp:
         except queue.Empty:
             pass
 
-        # keep sidebar labels in sync
         if self.running:
             self.status.config(text="ONLINE", fg=ACCENT)
             self.hdr_status.config(text="\u25cf ONLINE", fg=OK)
@@ -1315,7 +1231,6 @@ class JarvisApp:
         self.chat_box.see("end")
         self.chat_box.config(state="disabled")
 
-    # ---------- typed chat ----------
     def send_typed(self):
         text = self.entry.get().strip()
         if not text:
@@ -1332,10 +1247,8 @@ class JarvisApp:
         except Exception as e:
             self.log("sys", f"[Error] {e}")
 
-    # ---------- voice ----------
     @staticmethod
     def com_init():
-        # Needed so the voice engine works from a background thread on Windows
         try:
             import pythoncom
             pythoncom.CoInitialize()
@@ -1373,7 +1286,6 @@ class JarvisApp:
             self.log("sys", "Speech service unavailable (check your internet).")
             return ""
 
-    # ---------- brain ----------
     def ollama_chat(self, messages):
         for use_tools in (True, False):
             body = {"model": MODEL, "messages": messages, "stream": False}
@@ -1385,7 +1297,7 @@ class JarvisApp:
                 with urllib.request.urlopen(req, timeout=180) as resp:
                     return json.loads(resp.read().decode("utf-8"))
             except urllib.error.HTTPError as e:
-                if use_tools and e.code == 400:   # model without tool support: retry as plain chat
+                if use_tools and e.code == 400:
                     continue
                 raise
 
@@ -1397,7 +1309,7 @@ class JarvisApp:
         self.history.append({"role": "user", "content": question})
         try:
             answer = "That took too many steps, sorry."
-            for _ in range(5):                    # up to 5 rounds of tool use
+            for _ in range(5):
                 msg = self.ollama_chat(self.history)["message"]
                 self.history.append(msg)
                 calls = msg.get("tool_calls") or []
@@ -1419,7 +1331,7 @@ class JarvisApp:
             del self.history[start:]
             self.orb_state = self.base_state()
             return "Sorry, I couldn't reach my brain right now."
-        if len(self.history) > 25:                # keep memory short, never split a tool exchange
+        if len(self.history) > 25:
             rest = self.history[-20:]
             while rest and rest[0]["role"] != "user":
                 rest.pop(0)
@@ -1427,7 +1339,6 @@ class JarvisApp:
         return answer
 
     def run_tool(self, name, a):
-        """Run one tool the AI asked for. The returned text goes back to the AI."""
         try:
             if name in self.plugin_tools:
                 return str(self.plugin_tools[name][0](a))
@@ -1501,9 +1412,7 @@ class JarvisApp:
         except Exception as e:
             return f"Tool error: {e}"
 
-    # ---------- opening apps ----------
     def load_start_apps(self):
-        """Ask Windows for every app in the Start menu (classic + Store apps)."""
         try:
             ps = ("[Console]::OutputEncoding=[Text.Encoding]::UTF8; "
                   "Get-StartApps | ConvertTo-Json -Compress")
@@ -1530,7 +1439,6 @@ class JarvisApp:
                          creationflags=0x08000000 if shell else 0)
 
     def open_app(self, spoken):
-        """Return a spoken reply if an app was opened, else None."""
         words = [w for w in re.sub(r"[^a-z0-9+# ]", " ", spoken.lower()).split()
                  if w not in ("the", "app", "application", "program", "please", "for", "me")]
         name = " ".join(words)
@@ -1572,16 +1480,13 @@ class JarvisApp:
             return f"I found {display} but couldn't open it."
         return f"Opening {display}."
 
-    # ---------- commands ----------
     def handle_command(self, cmd):
-        """Return the reply to speak."""
         cmd = cmd.strip()
         if not cmd:
             return "Yes?"
 
         self.cmd_count += 1
 
-        # follow-up to "should I open his GitHub?"
         if self.pending_url:
             url, self.pending_url = self.pending_url, None
             if YES_RE.search(cmd):
@@ -1594,13 +1499,13 @@ class JarvisApp:
             self.pending_url = CREATOR_URL
             return f"I was created by {CREATOR_NAME}. Would you like me to open his {CREATOR_LINK_NAME}?"
 
-        for rx, fn, _owner in list(self.plugin_cmds):      # commands from store modules
+        for rx, fn, _owner in list(self.plugin_cmds):
             m = rx.search(cmd)
             if m:
                 try:
                     return str(fn(m))
                 except Exception:
-                    continue                                  # let the next command or the AI handle it
+                    continue
 
         if re.search(r"\bwhat('s| is) the time\b|\bwhat time is it\b", cmd):
             return datetime.datetime.now().strftime("It's %I:%M %p.").replace("It's 0", "It's ")
@@ -1632,7 +1537,6 @@ class JarvisApp:
 
         return self.ask_brain(cmd)
 
-    # ---------- main voice loop ----------
     def run_loop(self):
         self.com_init()
         self.conversation = False
@@ -1652,7 +1556,6 @@ class JarvisApp:
                 if not heard:
                     continue
 
-                # "Jarvis stop" works any time
                 if re.search(r"\bjarvis\b\W*\bstop\b", heard):
                     self.log("you", heard)
                     self.speak("Shutting down. Goodbye.")

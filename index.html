@@ -195,7 +195,6 @@
       transform: none
     }
 
-    /* demo */
     .demo {
       display: grid;
       grid-template-columns: 1fr 1.1fr;
@@ -286,7 +285,6 @@
       font-family: inherit
     }
 
-    /* features */
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
@@ -323,7 +321,6 @@
       font-size: 14px
     }
 
-    /* steps */
     .prog {
       height: 6px;
       background: var(--panel2);
@@ -763,16 +760,13 @@
   <div id="toast"></div>
 
   <script>
-    // ====== EDIT THIS: link to your release file (GitHub > Releases > upload Jarvis.exe) ======
     const DOWNLOAD_URL = "https://github.com/kavish-chanda/jarvis/releases/download/v1.1.2/Jarvis.exe";
-    const GITHUB_URL = "https://github.com/kavish-chanda";   // opened by the "who created you" demo
-    // ===========================================================================================
+    const GITHUB_URL = "https://github.com/kavish-chanda";
 
     const $ = s => document.querySelector(s);
     function toast(t) { const e = $("#toast"); e.textContent = t; e.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove("on"), 4200) }
     function download() { toast("Download starting. If Windows warns you, choose More info → Run anyway."); setTimeout(() => { location.href = DOWNLOAD_URL }, 900) }
 
-    /* ---------- orb ---------- */
     const PAL = { idle: [0, 212, 255], listen: [94, 255, 208], think: [255, 179, 71], speak: [0, 229, 255], off: [59, 76, 107] };
     function makeOrb(cv, opts) {
       const ctx = cv.getContext("2d"), N = 240, G = Math.PI * (3 - Math.sqrt(5)), P = [];
@@ -828,7 +822,6 @@
     });
     const demoOrb = makeOrb($("#demoOrb"), { bars: true });
 
-    /* ---------- voice (browser text-to-speech) ---------- */
     let voiceOn = true, voice = null;
     const canSpeak = "speechSynthesis" in window;
     function pickVoice() {
@@ -844,7 +837,6 @@
       })
     }
 
-    /* ---------- simulated demo ---------- */
     const log = $("#log"); let convo = false, off = false, busy = false, pending = false;
     const jokes = ["Why do programmers prefer dark mode? Because light attracts bugs.", "I would tell you a UDP joke, but you might not get it.", "There are 10 kinds of people: those who understand binary and those who don’t."];
     const cmds = [
@@ -891,7 +883,6 @@
     $("#vt").onclick = () => { voiceOn = !voiceOn; $("#vt").textContent = voiceOn ? "🔊 Voice on" : "🔇 Voice off"; if (!voiceOn && canSpeak) speechSynthesis.cancel() };
     if (!canSpeak) { $("#vt").style.display = "none" }
 
-    /* ---------- reveal, tilt, copy, checklist ---------- */
     const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) e.target.classList.add("in") }), { threshold: .12 });
     document.querySelectorAll(".reveal").forEach(e => io.observe(e));
     document.querySelectorAll(".card").forEach(c => {
@@ -913,7 +904,6 @@
     });
     upd();
 
-    /* ---------- module store ---------- */
     const MODS = [
       ["⏱️", "Focus Timer", "Pomodoro timer with voice control.", "Jarvis, start a 25 minute focus session"],
       ["₿", "Crypto Prices", "Live Bitcoin, Ethereum and Solana prices.", "What is the price of bitcoin?"],
@@ -958,7 +948,6 @@
     $("#all").onclick = () => { if (inst.size === MODS.length) inst.clear(); else MODS.forEach((_, i) => inst.add(i)); saveMods(); renderStore() };
     renderStore();
 
-    /* ---------- themes ---------- */
     const ST = {
       cyan: { dot: "#00d4ff", v: { "--bg": "#070b14", "--panel": "#0d1424", "--panel2": "#131d33", "--line": "#1c2a48", "--acc": "#00d4ff", "--mint": "#5effd0", "--txt": "#d6e4ff", "--dim": "#7a8aa8" }, pal: [[0, 212, 255], [94, 255, 208], [255, 179, 71], [0, 229, 255], [59, 76, 107]] },
       red: { dot: "#ffb000", v: { "--bg": "#0b0405", "--panel": "#150909", "--panel2": "#1e0e0f", "--line": "#6e1c1c", "--acc": "#ffb000", "--mint": "#ffd54a", "--txt": "#ffe9c9", "--dim": "#a07a60" }, pal: [[255, 176, 0], [255, 213, 74], [255, 122, 48], [255, 176, 0], [110, 60, 50]] },
